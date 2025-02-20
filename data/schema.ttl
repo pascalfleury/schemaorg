@@ -5488,11 +5488,7 @@ Dateline summaries are oriented more towards human readers than towards automate
 
 :deliveryTime a rdf:Property ;
     rdfs:label "deliveryTime" ;
-    rdfs:comment """The total delay between the receipt of the order and the goods reaching the final customer.
-
-In the context of [[OfferShippingDetails]] and [[ShippingService]], this field is used to specify the handling time and the shipping time if the merchant does the shipping.
-
-In the context of [[ShippingConditions]], this is generally used to specify the transit time.""" ;
+    rdfs:comment "The total delay between the receipt of the order and the goods reaching the final customer." ;
     :domainIncludes :DeliveryTimeSettings,
         :OfferShippingDetails ;
     :rangeIncludes :ShippingDeliveryTime ;
