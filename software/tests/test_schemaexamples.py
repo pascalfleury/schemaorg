@@ -12,6 +12,8 @@ if not os.getcwd() in sys.path:
 
 import software
 import software.SchemaExamples.schemaexamples as schemaexamples
+from unittest.mock import patch
+from software.util.paths import InputLayout
 
 
 THING_EXAMPLE = """TYPES: #eg-0999 Thing
@@ -38,8 +40,6 @@ class TestExampleFileParser(unittest.TestCase):
     def setUp(self):
         self.parser = schemaexamples.ExampleFileParser()
         self.temp_file = tempfile.NamedTemporaryFile()
-        from unittest.mock import patch
-        from software.util.paths import InputLayout
         patcher = patch('software.SchemaExamples.schemaexamples.paths.DefaultInputLayout')
         mock_input_layout = patcher.start()
         mock_input_layout.return_value = InputLayout(os.path.dirname(self.temp_file.name))

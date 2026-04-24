@@ -32,6 +32,7 @@ import software.SchemaExamples.schemaexamples as schemaexamples
 from software.util.sort_dict import sort_dict, sort_xml
 
 VOCABURI: str = sdotermsource.SdoTermSource.vocabUri()
+from software.util.sdoowl import OwlBuild
 log: logging.Logger = logging.getLogger(__name__)
 
 
@@ -112,7 +113,6 @@ def httpequivs(page: str) -> str:
 
 
 def owl(page: str) -> str:
-    from software.util.sdoowl import OwlBuild
     return str(OwlBuild().getContent())
 
 

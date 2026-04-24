@@ -21,6 +21,7 @@ import software.SchemaTerms.sdoterm as sdoterm
 import software.SchemaTerms.sdocollaborators as sdocollaborators
 import software.SchemaTerms.localmarkdown as localmarkdown
 import software.util.paths as paths
+from software.util.schema_graph import SchemaOrgGraph
 
 import software.util.pretty_logger as pretty_logger
 from software.util.sort_dict import sort_dict
@@ -125,14 +126,8 @@ class _TermAccumulator:
 def _loadOneSourceGraph(file_path: Union[str, Path]) -> rdflib.Graph:
     """Load the content of one source file."""
     path: Path = Path(file_path)
-    formats: Dict[str, str] = {".nt": "nt", ".ttl": "turtle"}
-    file_format: Optional[str] = formats.get(path.suffix)
-    if not file_format:
-        raise NotImplementedError(f"Unsupported file format: {path.suffix}")
     try:
-        graph: rdflib.Graph = rdflib.Graph()
-        graph.parse(source=str(path), format=file_format)
-        return graph
+        return SchemaOrgGraph(path).graph()
     except Exception as e:
         message: str = f"Error parsing source file '{file_path}': {e}"
         log.warning(message)

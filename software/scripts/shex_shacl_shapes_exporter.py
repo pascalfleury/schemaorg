@@ -20,6 +20,8 @@ from rdflib.collection import Collection
 from rdflib.term import Node
 
 from software.util.sort_dict import sort_dict
+from software.util.schema_graph import SchemaOrgGraph
+import software.util.schemaversion as schemaversion
 
 BASE: Namespace = Namespace("http://schema.org/validation#")
 SCHEMA: Namespace = Namespace("http://schema.org/")
@@ -347,10 +349,7 @@ def generate_files(
 ) -> None:
     term_defs_path = Path(term_defs_path)
 
-    with term_defs_path.open() as f:
-        term_defs: str = f.read()
-
-    graph: Graph = Graph().parse(data=term_defs, format=input_format)
+    graph: Graph = SchemaOrgGraph(term_defs_path).graph()
     graph.bind("schema", SCHEMA)
 
     shexj_path: Path = paths.DefaultOutputLayout().domain_file(paths.Domain.RELEASE, "schemaorg-shapes.shexj")
@@ -367,7 +366,6 @@ def generate_files(
 
 
 if __name__ == "__main__":
-    import software.util.schemaversion as schemaversion
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-s", "--sourcefile", help="rdf format source file")
     parser.add_argument(

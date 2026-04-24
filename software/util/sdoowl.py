@@ -39,6 +39,7 @@ from software.SchemaTerms.sdoterm import *
 from software.SchemaTerms.localmarkdown import Markdown
 
 import software.util.schemaversion as schemaversion
+from software.SchemaTerms.localmarkdown import MarkdownTool
 
 VOCABURI: str = SdoTermSource.vocabUri()
 
@@ -82,7 +83,6 @@ def _MakePrettyComment(text: str) -> ElementTree.Comment:
 
 class OwlBuild:
     def __init__(self) -> None:
-        from software.SchemaTerms.localmarkdown import MarkdownTool
         self.typesCount: int = 0
         self.propsCount: int = 0
         self.namedCount: int = 0

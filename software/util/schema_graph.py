@@ -38,6 +38,9 @@ class SchemaOrgGraph(object):
         else:
             self.g.parse(str(source), format="turtle")
 
+    def graph(self) -> rdflib.Graph:
+        return self.g
+
     def __getattr__(self, name: str) -> Any:
         return getattr(self.g, name)
 

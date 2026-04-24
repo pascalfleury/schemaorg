@@ -27,6 +27,8 @@ ldscript_match: re.Pattern = re.compile(
 )
 
 
+import codecs
+import requests
 log: logging.Logger = logging.getLogger(__name__)
 
 
@@ -393,8 +395,6 @@ class ExampleFileParser:
         )
 
     def parse(self, filen: str) -> List[Example]:
-        import codecs
-        import requests
 
         self.file = filen
         self.filepos = 0

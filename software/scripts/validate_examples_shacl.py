@@ -19,6 +19,7 @@ if str(Path.cwd()) not in sys.path:
 
 import software.SchemaExamples.schemaexamples as schemaexamples
 import software.util.schemaversion as schemaversion
+from software.util.schema_graph import SchemaOrgGraph
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -44,11 +45,9 @@ def validate_examples(examples: list, invalid_only: bool, source_output: bool) -
         sys.exit(os.EX_CONFIG)
 
     log.info("Loading SHACL shapes and subclass graphs...")
-    shacl_graph: rdflib.Graph = rdflib.Graph()
-    shacl_graph.parse(source=str(shacl_file), format="turtle")
+    shacl_graph: rdflib.Graph = SchemaOrgGraph(shacl_file).graph()
 
-    ont_graph: rdflib.Graph = rdflib.Graph()
-    ont_graph.parse(source=str(subclass_file), format="turtle")
+    ont_graph: rdflib.Graph = SchemaOrgGraph(subclass_file).graph()
 
     count: int = 0
     error_count: int = 0

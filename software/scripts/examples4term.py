@@ -24,6 +24,7 @@ for path in [
 
 from sdotermsource import SdoTermSource
 from schemaexamples import SchemaExamples
+import csv
 
 
 if not SdoTermSource.SOURCEGRAPH:
@@ -89,7 +90,6 @@ def buildoutput(workingex, fname):
 
 
 def buildcsvoutput(workingex, fname):
-    import csv
 
     if not fname.endswith(".csv"):
         fname = fname + ".csv"

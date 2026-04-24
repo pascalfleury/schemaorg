@@ -17,6 +17,7 @@ from sdoterm import *
 from localmarkdown import Markdown
 
 import jinja2
+from software.util.schema_graph import SchemaOrgGraph
 Markdown.setWikilinkCssClass("localLink")
 Markdown.setWikilinkPrePath("/")
 
@@ -26,8 +27,8 @@ if VOCABURI.startswith("https://"):
 else:
     triplesfile = "../data/schemaorg-all-http.nt"
 
-termgraph = rdflib.Graph()
-termgraph.parse(triplesfile, format="nt")
+
+termgraph = SchemaOrgGraph(triplesfile).graph()
 
 print("loaded %s triples" % len(termgraph))
 
