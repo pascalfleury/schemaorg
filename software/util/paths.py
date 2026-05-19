@@ -130,9 +130,16 @@ class OutputLayout:
 
 
 def DefaultInputLayout() -> InputLayout:
-    """Returns the default InputLayout instance relative to the repository root."""
-    root_dir = Path(__file__).resolve().parent.parent.parent
-    return InputLayout(root_dir)
+    """Returns the default InputLayout instance relative to the current working directory."""
+    # Find project root by looking for 'data' directory starting from CWD and going up
+    root = Path.cwd()
+    for _ in range(5):
+        if (root / "data").exists() and (root / "software").exists():
+            return InputLayout(root)
+        if root.parent == root:
+            break
+        root = root.parent
+    return InputLayout(Path.cwd())
 
 
 def DefaultOutputLayout() -> OutputLayout:

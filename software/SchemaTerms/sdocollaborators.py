@@ -35,6 +35,7 @@ class collaborator(object):
 
     COLLABORATORS: Dict[str, "collaborator"] = {}
     CONTRIBUTORS: Dict[str, "collaborator"] = {}
+    _LOADED: bool = False
 
     def __init__(self, ref: str, desc: Optional[str] = None) -> None:
         self.ref: str = ref
@@ -52,7 +53,7 @@ class collaborator(object):
         if desc:
             self._parseDesc(desc)
 
-        collaborator.COLLABORATORS[self.ref] = self
+        collaborator.COLLABORATORS[os.path.basename(self.ref)] = self
         log.debug(f"Created collaborator for '{ref}'")
 
     def __str__(self) -> str:
@@ -133,8 +134,8 @@ class collaborator(object):
 
     @classmethod
     def getContributor(cls, ref: str) -> Optional["collaborator"]:
-        key: str = os.path.basename(ref)
         cls.loadContributors()
+        key: str = os.path.basename(ref)
         cont: Optional[collaborator] = cls.CONTRIBUTORS.get(key, None)
         if not cont:
             log.warning(f"No contributor for '{ref}'")
@@ -154,10 +155,15 @@ class collaborator(object):
 
     @classmethod
     def loadCollaborators(cls) -> None:
-        if not len(cls.COLLABORATORS):
-            for file_path in paths.DefaultInputLayout().domain_files(paths.Domain.DATA, "collab/*.md"):
-                cls.createCollaborator(str(file_path))
-            log.info(f"Loaded {len(cls.COLLABORATORS)} collaborators")
+        if not cls._LOADED:
+            # Find data dir relative to this file
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            data_dir = os.path.join(base_path, "data", "collab")
+            files = glob.glob(os.path.join(data_dir, "*.md"))
+            for file_path in sorted(files):
+                cls.createCollaborator(file_path)
+            log.info(f"Loaded {len(cls.COLLABORATORS)} collaborators from {data_dir}")
+            cls._LOADED = True
 
     @classmethod
     def createContributor(cls, ref: str) -> None:
@@ -173,7 +179,7 @@ class collaborator(object):
             cls.loadCollaborators()
             query: str = """
             SELECT distinct ?val WHERE {
-                    [] schema:contributor ?val.
+                    [] <https://schema.org/contributor> ?val.
             }"""
             res = sdotermsource.SdoTermSource.query(query)
             for row in res:

@@ -5,10 +5,32 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+import rdflib
+
+import software
 
 import util.paths as paths
 from util.sort_dict import sort_dict
+
+VOCABURI: str = "https://schema.org/"
+URI: rdflib.Namespace = rdflib.Namespace(VOCABURI)
+DATATYPEURI: Optional[rdflib.URIRef] = None
+ENUMERATIONURI: Optional[rdflib.URIRef] = None
+THINGURI: Optional[rdflib.URIRef] = None
+
+
+def setVocabUri(uri: Optional[str] = None) -> None:
+    global VOCABURI, URI, DATATYPEURI, ENUMERATIONURI, THINGURI
+    VOCABURI = uri or "https://schema.org/"
+    URI = rdflib.Namespace(VOCABURI)
+    DATATYPEURI = rdflib.URIRef(f"{VOCABURI}DataType")
+    ENUMERATIONURI = rdflib.URIRef(f"{VOCABURI}Enumeration")
+    THINGURI = rdflib.URIRef(f"{VOCABURI}Thing")
+
+
+setVocabUri()  # Initialize
 
 
 class constants:
@@ -83,6 +105,3 @@ def setVersion(ver: str, date: str) -> None:
     paths.DefaultInputLayout().domain_file(
         paths.Domain.ROOT, "versions.json"
     ).write_text(json.dumps(sort_dict(versiondata), indent=4))
-
-
-
