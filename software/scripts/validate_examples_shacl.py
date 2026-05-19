@@ -50,6 +50,7 @@ def validate_examples(examples: list, invalid_only: bool, source_output: bool) -
     shacl_graph: rdflib.Graph = rdflib.Graph()
     shacl_graph.parse(source=str(shacl_file), format="turtle")
 
+
     ont_graph: rdflib.Graph = rdflib.Graph()
     ont_graph.parse(source=str(subclass_file), format="turtle")
 

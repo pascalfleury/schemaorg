@@ -13,8 +13,12 @@ if os.getcwd() not in sys.path:
     sys.path.insert(1, os.getcwd())
 import software
 
-from SchemaTerms.sdoterm import *
-from SchemaTerms.sdotermsource import *
+from software.util.paths import DefaultInputLayout
+from software.data_model.loader import GraphLoader
+from software.data_model.registry import TermRegistry
+from software.data_model.type_map import SdoTermType
+from rdflib import URIRef
+import util.schema as schema
 
 
 parser = argparse.ArgumentParser()
@@ -23,12 +27,10 @@ args = parser.parse_args()
 
 exts = {"rdf": ".rdf", "nt": ".nt", "json-ld": ".jsonld", "turtle": ".ttl"}
 
-files = []
-triplesfilesglob = ["data/*.ttl", "data/ext/*/*.ttl"]
-schemaroot = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")) + "/"
-for g in triplesfilesglob:
-    files.extend(glob.glob(schemaroot + g))
-SdoTermSource.loadSourceGraph(files)
+layout = DefaultInputLayout()
+loader = GraphLoader.from_layout(layout)
+loader.load_all()
+registry = TermRegistry.get_instance()
 
 s_p = "http://schema.org/"
 s_s = "https://schema.org/"
@@ -37,12 +39,13 @@ outGraph.bind("schema_p", s_p)
 outGraph.bind("schema_s", s_s)
 outGraph.bind("owl", OWL)
 
-VOCABURI = SdoTermSource.vocabUri()
-terms = SdoTermSource.getAllTerms()
+VOCABURI = schema.VOCABURI
+terms = [t.id for t in registry.all_terms().values() if t.id]
 print("Loaded %d terms" % len(terms))
 
 for term in terms:
-    t = SdoTermSource.getTerm(term)
+    t = registry.get_by_id(term)
+    if not t: continue
 
     if t.uri.startswith(VOCABURI):  # Filter out non Schema terms
         eqiv = OWL.equivalentClass

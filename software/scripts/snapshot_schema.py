@@ -9,7 +9,8 @@ if os.getcwd() not in sys.path:
     sys.path.insert(1, os.getcwd())
 import software
 
-import SchemaTerms.sdotermsource as sdotermsource
+from software.util.paths import DefaultInputLayout
+from software.data_model.loader import GraphLoader
 import scripts.buildfiles as buildfiles
 import util.fileutils as fileutils
 import util.pretty_logger as pretty_logger
@@ -19,8 +20,6 @@ log: logging.Logger = logging.getLogger(__name__)
 
 
 def snapshot_ttl(output_dir: str = "software/tests/snapshot") -> None:
-    # Take some copies of globals we need to manipulate.
-    # TODO: these globals should be arguments or similar
     outputdir_copy: str = schema.config.OUTPUTDIR
     selectors_copy: Set[str] = fileutils.FILESET_SELECTORS
     protocols_copy: Set[str] = fileutils.FILESET_PROTOCOLS
@@ -29,7 +28,9 @@ def snapshot_ttl(output_dir: str = "software/tests/snapshot") -> None:
     fileutils.FILESET_PROTOCOLS = {"https"}
 
     log.info("Building snapshot file...")
-    sdotermsource.SdoTermSource.loadSourceGraph("default")
+    layout = DefaultInputLayout()
+    loader = GraphLoader.from_layout(layout)
+    loader.load_all()
     buildfiles.exportrdf("RDFExport.turtle", subdirectory_path=output_dir)
     log.info(f"Snapshot file created in {output_dir}")
 

@@ -11,29 +11,26 @@ if os.getcwd() not in sys.path:
 import software
 
 from SchemaTerms.localmarkdown import Markdown
-from SchemaTerms.sdoterm import *
-from SchemaTerms.sdotermsource import *
+from software.util.paths import DefaultInputLayout
+from software.data_model.loader import GraphLoader
+from software.data_model.registry import TermRegistry
+from software.data_model.type_map import SdoTermType
 
 
 Markdown.setWikilinkCssClass("localLink")
 Markdown.setWikilinkPrePath("/")
 
-DATADIR = os.path.join(os.path.dirname(__file__), "../data")
-triplesfile = os.path.join(DATADIR, "schemaorg-all-https.nt")
-
-
-termgraph = rdflib.Graph()
-termgraph.parse(triplesfile, format="nt")
-
-print("loaded %s triples" % len(termgraph))
-
-SdoTermSource.setSourceGraph(termgraph)
-print("Types Count: %s" % len(SdoTermSource.getAllTypes(expanded=False)))
-print("Properties Count: %s" % len(SdoTermSource.getAllProperties(expanded=False)))
+layout = DefaultInputLayout()
+loader = GraphLoader.from_layout(layout)
+loader.load_all()
+registry = TermRegistry.get_instance()
+print("Types Count: %s" % len(registry.get_all_types()))
+print("Properties Count: %s" % len(registry.get_all_properties()))
 
 
 for termname in ["acceptedAnswer", "Book"]:
-    term = SdoTermSource.getTerm(termname)
+    term = registry.get_by_id(termname)
+    if not term: continue
 
     print("")
     print("TYPE: %s" % term.termType)
@@ -75,7 +72,8 @@ for termname in ["acceptedAnswer", "Book"]:
             print("Parent Enumeration: %s" % term.enumerationParent)
 
         for p in term.properties:
-            prop = SdoTermSource.getTerm(p)
+            prop = registry.get_by_id(p)
+            if not prop: continue
             print("Prop: %s.  Pending: %s" % (prop.id, prop.pending))
             print("   Expected Types: %s" % prop.rangeIncludes)
             print("   Comment: %s" % prop.comment)

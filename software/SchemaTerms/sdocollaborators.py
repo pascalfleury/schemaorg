@@ -13,13 +13,15 @@ import re
 import sys
 import traceback
 import typing
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
 import software
 
 import SchemaTerms.localmarkdown as localmarkdown
-import SchemaTerms.sdoterm as sdoterm
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.models import SdoTerm
+from software.data_model.registry import TermRegistry
+from rdflib import URIRef
+from pathlib import Path
 import util.paths as paths
 import util.schema as schema
 
@@ -35,13 +37,14 @@ class collaborator(object):
 
     COLLABORATORS: Dict[str, "collaborator"] = {}
     CONTRIBUTORS: Dict[str, "collaborator"] = {}
+    _LOADED: bool = False
 
     def __init__(self, ref: str, desc: Optional[str] = None) -> None:
         self.ref: str = ref
         self.urirel: str = os.path.join("/docs", "collab", ref)
         self.uri: str = schema.constants.HOMEPAGE + self.urirel
         self.docurl: str = self.urirel
-        self.terms: Optional[Sequence[sdoterm.SdoTerm]] = None
+        self.terms: Optional[Sequence[Any]] = None
         self.contributor: bool = False
         self.img: Optional[str] = None
         self.code: Optional[str] = None
@@ -52,7 +55,7 @@ class collaborator(object):
         if desc:
             self._parseDesc(desc)
 
-        collaborator.COLLABORATORS[self.ref] = self
+        collaborator.COLLABORATORS[os.path.basename(self.ref)] = self
         log.debug(f"Created collaborator for '{ref}'")
 
     def __str__(self) -> str:
@@ -115,11 +118,12 @@ class collaborator(object):
     def isContributor(self) -> bool:
         return self.contributor
 
-    def getTerms(self) -> Sequence[sdoterm.SdoTerm]:
+    def getTerms(self) -> Sequence[Any]:
         if not self.contributor:
             return []
         if not self.terms:
-            self.terms = sdotermsource.SdoTermSource.getAcknowledgedTerms(self.uri)
+            registry = TermRegistry.get_instance()
+            self.terms = [t for t in registry.get_all_terms() if URIRef(self.uri) in getattr(t, "contributor_uris", [])]
         return self.terms
 
     @classmethod
@@ -133,20 +137,19 @@ class collaborator(object):
 
     @classmethod
     def getContributor(cls, ref: str) -> Optional["collaborator"]:
-        key: str = os.path.basename(ref)
         cls.loadContributors()
+        key: str = os.path.basename(ref)
         cont: Optional[collaborator] = cls.CONTRIBUTORS.get(key, None)
         if not cont:
             log.warning(f"No contributor for '{ref}'")
         return cont
 
     @classmethod
-    def createCollaborator(cls, file_path: str) -> Optional["collaborator"]:
-        code: str = os.path.basename(file_path)
-        ref, _ = os.path.splitext(code)
+    def createCollaborator(cls, file_path: Union[str, Path]) -> Optional["collaborator"]:
+        pth = Path(file_path)
+        ref = pth.stem
         try:
-            with open(file_path, "r") as file_handle:
-                desc = file_handle.read()
+            desc = pth.read_text(encoding="utf-8")
             return cls(ref, desc=desc)
         except OSError as e:
             log.error(f"Error loading colaborator source: {e}")
@@ -154,10 +157,13 @@ class collaborator(object):
 
     @classmethod
     def loadCollaborators(cls) -> None:
-        if not len(cls.COLLABORATORS):
-            for file_path in paths.DefaultInputLayout().domain_files(paths.Domain.DATA, "collab/*.md"):
-                cls.createCollaborator(str(file_path))
+        if not cls._LOADED:
+            layout = paths.DefaultInputLayout()
+            files = layout.domain_files(paths.Domain.DATA, "collab/*.md")
+            for file_path in sorted(files):
+                cls.createCollaborator(file_path)
             log.info(f"Loaded {len(cls.COLLABORATORS)} collaborators")
+            cls._LOADED = True
 
     @classmethod
     def createContributor(cls, ref: str) -> None:
@@ -171,13 +177,11 @@ class collaborator(object):
     def loadContributors(cls) -> None:
         if not len(cls.CONTRIBUTORS):
             cls.loadCollaborators()
-            query: str = """
-            SELECT distinct ?val WHERE {
-                    [] schema:contributor ?val.
-            }"""
-            res = sdotermsource.SdoTermSource.query(query)
-            for row in res:
-                cls.createContributor(str(row.val))
+            contribs: Set[Any] = set()
+            for t in TermRegistry.get_instance().get_all_terms():
+                contribs.update(getattr(t, "contributor_uris", []))
+            for val in sorted(contribs):
+                cls.createContributor(str(val))
             log.info(f"Loaded {len(cls.CONTRIBUTORS)} contributors")
 
     @classmethod

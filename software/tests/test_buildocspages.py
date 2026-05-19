@@ -8,8 +8,8 @@ import unittest
 import software
 
 import SchemaExamples.schemaexamples as schemaexamples
-import SchemaTerms.sdoterm as sdoterm
-import SchemaTerms.sdotermsource as sdotermsource
+from software.util.paths import DefaultInputLayout
+from software.data_model.loader import GraphLoader
 import util.buildocspages as buildocspages
 
 
@@ -18,7 +18,9 @@ class TestBuildDocs(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        sdotermsource.SdoTermSource.sourceGraph()
+        layout = DefaultInputLayout()
+        loader = GraphLoader.from_layout(layout)
+        loader.load_all()
 
     def testJsonldtree(self):
         buildocspages.jsonldtree(page=None)

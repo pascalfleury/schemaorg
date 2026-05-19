@@ -21,12 +21,11 @@ from rdflib.term import Literal, Node, URIRef
 import software
 
 from SchemaTerms.localmarkdown import Markdown, MarkdownTool
-from SchemaTerms.sdoterm import *
-from SchemaTerms.sdotermsource import SdoTermSource
+from software.data_model.registry import TermRegistry
 import util.schema as schema
 
 
-VOCABURI: str = SdoTermSource.vocabUri()
+VOCABURI: str = schema.VOCABURI
 
 NAMESPACES: Dict[str, str] = {
     "xml:base": VOCABURI,
@@ -101,7 +100,9 @@ class OwlBuild:
         self.dom.append(_MakePrettyComment(text="Definitions"))
 
     def _loadGraph(self) -> None:
-        self.list(SdoTermSource.sourceGraph())
+        registry = TermRegistry.get_instance()
+        if isinstance(registry._graph, rdflib.Graph):
+            self.list(registry._graph)
 
     def getContent(self) -> str:
         return self.prettify(self.dom)

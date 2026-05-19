@@ -12,16 +12,19 @@ if os.getcwd() not in sys.path:
 import software
 
 from SchemaExamples.schemaexamples import SchemaExamples
-from SchemaTerms.sdotermsource import SdoTermSource
+from software.util.paths import DefaultInputLayout
+from software.data_model.loader import GraphLoader
+from software.data_model.registry import TermRegistry
 import util.textutils as textutils
 
-if not SdoTermSource.SOURCEGRAPH:
+registry = TermRegistry.get_instance()
+if not getattr(registry, "_graph", None):
     print("Loading triples files")
-    SdoTermSource.loadSourceGraph("default")
-    print(
-        "loaded %s triples - %s terms"
-        % (len(SdoTermSource.sourceGraph()), len(SdoTermSource.getAllTerms()))
-    )
+    layout = DefaultInputLayout()
+    loader = GraphLoader.from_layout(layout)
+    loader.load_all()
+    graph_len = len(registry._graph) if registry._graph else 0
+    print(f"loaded {graph_len} triples - {len(registry)} terms")
 
 workingterms = []
 
@@ -34,7 +37,7 @@ def getterms(term, recursive):
         termlist.extend(ts)
 
     for t in termlist:
-        term = SdoTermSource.getTerm(t)
+        term = registry.get_by_id(t)
         if not term:
             print("No such term: %s" % t)
             continue
@@ -51,9 +54,10 @@ def addtoworking(term):
 
 
 def addrecursive(term):
-    for t in term.subs:
+    for sub_obj in getattr(term, "subs", []):
+        t = sub_obj.id
         addtoworking(t)
-        addrecursive(SdoTermSource.getTerm(t))
+        addrecursive(sub_obj)
 
 
 def getexamples(terms):

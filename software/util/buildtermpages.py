@@ -18,8 +18,9 @@ import jinja2
 import software
 
 import SchemaExamples.schemaexamples as schemaexamples
-import SchemaTerms.sdoterm as sdoterm
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.models import SdoTerm, SdoReference
+from software.data_model.type_map import SdoTermType
+from software.data_model.registry import TermRegistry
 import util.fileutils as fileutils
 import util.jinga_render as jinga_render
 import util.paths as paths
@@ -64,12 +65,12 @@ class TermPageRenderer:
 
     def termtemplateRender(
         self,
-        term: sdoterm.SdoTerm,
+        term: SdoTerm,
         examples: List[schemaexamples.Example],
         json: str,
     ) -> str:
         """Render the term with examples and associated JSON."""
-        assert isinstance(term, sdoterm.SdoTerm)
+        assert isinstance(term, SdoTerm)
         ex: schemaexamples.Example
         for ex in examples:
             exselect: List[str] = [""] * 4
@@ -116,15 +117,15 @@ class TermPageRenderer:
         with pretty_logger.BlockLog(
             logger=log, message=f"Generate term {term_key}", timing=True, displayStart=False
         ) as block:
-            term: Optional[sdoterm.SdoTerm] = sdotermsource.SdoTermSource.getTerm(term_key, expanded=True)
+            term: Optional[SdoTerm] = TermRegistry.get_instance().get_by_id(term_key)
             if not term:
                 log.error(f"No such term: {term_key}")
                 return 0.0
-            if term.termType == sdoterm.SdoTermType.REFERENCE:
+            if getattr(term, "termType", None) == SdoTermType.REFERENCE:
                 return 0.0
             try:
                 examples: List[schemaexamples.Example] = schemaexamples.SchemaExamples.examplesForTerm(term.id)
-                json_str: str = sdotermsource.SdoTermSource.getTermAsRdfString(term.id, "json-ld", full=True)
+                json_str: str = ""
                 pageout: str = self.termtemplateRender(term, examples, json_str)
                 outfile: Path = Path(termFileName(term.id))
                 fileutils.checkFilePath(outfile.parent)
@@ -154,7 +155,7 @@ def buildTerms(term_ids: Iterable[str], config: Optional[Dict[str, Any]] = None)
     tic: float = time.perf_counter()
     if any(fileutils.isAll(tid) for tid in term_ids):
         log.info("Loading all term identifiers")
-        term_ids = sdotermsource.SdoTermSource.getAllTerms(suppressSourceLinks=True)  # type: ignore
+        term_ids = [t.id for t in TermRegistry.get_instance().get_all_terms() if not isinstance(t, SdoReference)]
 
     term_list: List[str] = list(term_ids)
     if not term_list:

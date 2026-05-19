@@ -14,8 +14,9 @@ if os.getcwd() not in sys.path:
     sys.path.insert(1, os.getcwd())
 import software
 
-import SchemaTerms.sdoterm as sdoterm
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.models import SdoTerm
+from software.data_model.type_map import SdoTermType
+from software.data_model.registry import TermRegistry
 import util.pretty_logger as pretty_logger
 
 
@@ -28,20 +29,21 @@ log: logging.Logger = logging.getLogger(__name__)
 
 
 def generateTerms(tags: bool = False) -> Generator[str, None, None]:
-    for term in sdotermsource.SdoTermSource.getAllTerms(expanded=True):
-        if not isinstance(term, sdoterm.SdoTerm):
+    terms = TermRegistry.get_instance().get_all_terms()
+    for term in terms:
+        if not isinstance(term, SdoTerm):
             continue
         label: str = ""
         if tags:
-            if term.termType == sdoterm.SdoTermType.PROPERTY:
+            if getattr(term, "termType", None) == SdoTermType.PROPERTY:
                 label = " p"
-            elif term.termType == sdoterm.SdoTermType.TYPE:
+            elif getattr(term, "termType", None) == SdoTermType.TYPE:
                 label = " t"
-            elif term.termType == sdoterm.SdoTermType.DATATYPE:
+            elif getattr(term, "termType", None) == SdoTermType.DATATYPE:
                 label = " d"
-            elif term.termType == sdoterm.SdoTermType.ENUMERATION:
+            elif getattr(term, "termType", None) == SdoTermType.ENUMERATION:
                 label = " e"
-            elif term.termType == sdoterm.SdoTermType.ENUMERATIONVALUE:
+            elif getattr(term, "termType", None) == SdoTermType.ENUMERATIONVALUE:
                 label = " v"
         yield term.id + label + "\n"
 

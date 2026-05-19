@@ -10,8 +10,10 @@ from typing import Any, Dict, List, Optional, Set
 
 import software
 
-import SchemaTerms.sdoterm as sdoterm
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.models import SdoTerm, SdoProperty, SdoReference
+from software.data_model.type_map import SdoTermType
+from software.data_model.registry import TermRegistry
+import util.schema as schema
 import util.pretty_logger as pretty_logger
 from util.sort_dict import sort_dict
 
@@ -40,24 +42,31 @@ def createcontext() -> str:
         }
 
         done_namespaces: Set[str] = set()
-        for pref, path in sdotermsource.SdoTermSource.sourceGraph().namespaces():
-            pref_str: str = str(pref)
-            if pref_str not in done_namespaces:
-                done_namespaces.add(pref_str)
-                if pref_str == "schema":
-                    path = SCHEMAURI  # Override vocab setting to maintain http compatibility
-                if pref_str == "geo":
-                    continue
-                json_context[pref_str] = path
+        registry = TermRegistry.get_instance()
+        if getattr(registry, "_graph", None):
+            for pref, path in registry._graph.namespaces():
+                pref_str: str = str(pref)
+                if pref_str not in done_namespaces:
+                    done_namespaces.add(pref_str)
+                    if pref_str == "schema":
+                        path = SCHEMAURI  # Override vocab setting to maintain http compatibility
+                    if pref_str == "geo":
+                        continue
+                    json_context[pref_str] = path
 
-        all_terms: List[sdoterm.SdoTerm] = sdotermsource.SdoTermSource.getAllTerms(
-            expanded=True, suppressSourceLinks=True
-        )
+        all_terms: List[Any] = registry.get_all_terms()
         for term in all_terms:
-            if not isinstance(term, sdoterm.SdoTerm):
+            if not isinstance(term, SdoTerm) or isinstance(term, SdoReference):
                 continue
-            if term.termType == sdoterm.SdoTermType.REFERENCE:
+            if getattr(term, "termType", None) == SdoTermType.REFERENCE:
                 continue
-            json_context[term.id] = {"@id": sdotermsource.prefixedIdFromUri(term.uri)}
+            term_json: Dict[str, Any] = {"@id": schema.prefixedIdFromUri(term.uri)}
+            if getattr(term, "termType", None) == SdoTermType.PROPERTY:
+                types: Set[str] = _convertTypes([t.id for t in getattr(term, "rangeIncludes", [])])
+                if len(types) == 1:
+                    term_json["@type"] = types.pop()
+                elif len(types) > 1:
+                    term_json["@type"] = sorted(list(types))
+            json_context[term.id] = term_json
         json_object: Dict[str, Any] = {"@context": json_context}
         return json.dumps(sort_dict(json_object), indent=2)
