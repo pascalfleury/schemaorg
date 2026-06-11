@@ -284,10 +284,11 @@ class SchemaExamples:
             log.info(f"Loaded {SchemaExamples.count()} examples")
 
     @staticmethod
-    def examplesForTerm(term: str) -> List[Example]:
+    def examplesForTerm(term: Any) -> List[Example]:
         SchemaExamples.loaded()
+        term_id = getattr(term, "id", str(term))
         examples: List[Example] = []
-        examps: Optional[List[str]] = SchemaExamples.EXAMPLESMAP.get(term)
+        examps: Optional[List[str]] = SchemaExamples.EXAMPLESMAP.get(term_id)
         if examps:
             for e in examps:
                 ex: Optional[Example] = SchemaExamples.EXAMPLES.get(e)

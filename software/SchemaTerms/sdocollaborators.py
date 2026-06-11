@@ -13,13 +13,15 @@ import re
 import sys
 import traceback
 import typing
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
 import software
 
 import SchemaTerms.localmarkdown as localmarkdown
-import SchemaTerms.sdoterm as sdoterm
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.models import SdoTerm
+from software.data_model.registry import TermRegistry
+from rdflib import URIRef
+from pathlib import Path
 import util.paths as paths
 import util.schema as schema
 
@@ -42,7 +44,7 @@ class collaborator(object):
         self.urirel: str = os.path.join("/docs", "collab", ref)
         self.uri: str = schema.constants.HOMEPAGE + self.urirel
         self.docurl: str = self.urirel
-        self.terms: Optional[Sequence[sdoterm.SdoTerm]] = None
+        self.terms: Optional[Sequence[Any]] = None
         self.contributor: bool = False
         self.img: Optional[str] = None
         self.code: Optional[str] = None
@@ -116,11 +118,12 @@ class collaborator(object):
     def isContributor(self) -> bool:
         return self.contributor
 
-    def getTerms(self) -> Sequence[sdoterm.SdoTerm]:
+    def getTerms(self) -> Sequence[Any]:
         if not self.contributor:
             return []
         if not self.terms:
-            self.terms = sdotermsource.SdoTermSource.getAcknowledgedTerms(self.uri)
+            registry = TermRegistry.get_instance()
+            self.terms = [t for t in registry.get_all_terms() if URIRef(self.uri) in getattr(t, "contributor_uris", [])]
         return self.terms
 
     @classmethod
@@ -142,12 +145,11 @@ class collaborator(object):
         return cont
 
     @classmethod
-    def createCollaborator(cls, file_path: str) -> Optional["collaborator"]:
-        code: str = os.path.basename(file_path)
-        ref, _ = os.path.splitext(code)
+    def createCollaborator(cls, file_path: Union[str, Path]) -> Optional["collaborator"]:
+        pth = Path(file_path)
+        ref = pth.stem
         try:
-            with open(file_path, "r") as file_handle:
-                desc = file_handle.read()
+            desc = pth.read_text(encoding="utf-8")
             return cls(ref, desc=desc)
         except OSError as e:
             log.error(f"Error loading colaborator source: {e}")
@@ -156,13 +158,11 @@ class collaborator(object):
     @classmethod
     def loadCollaborators(cls) -> None:
         if not cls._LOADED:
-            # Find data dir relative to this file
-            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            data_dir = os.path.join(base_path, "data", "collab")
-            files = glob.glob(os.path.join(data_dir, "*.md"))
+            layout = paths.DefaultInputLayout()
+            files = layout.domain_files(paths.Domain.DATA, "collab/*.md")
             for file_path in sorted(files):
                 cls.createCollaborator(file_path)
-            log.info(f"Loaded {len(cls.COLLABORATORS)} collaborators from {data_dir}")
+            log.info(f"Loaded {len(cls.COLLABORATORS)} collaborators")
             cls._LOADED = True
 
     @classmethod
@@ -177,13 +177,11 @@ class collaborator(object):
     def loadContributors(cls) -> None:
         if not len(cls.CONTRIBUTORS):
             cls.loadCollaborators()
-            query: str = """
-            SELECT distinct ?val WHERE {
-                    [] <https://schema.org/contributor> ?val.
-            }"""
-            res = sdotermsource.SdoTermSource.query(query)
-            for row in res:
-                cls.createContributor(str(row.val))
+            contribs: Set[Any] = set()
+            for t in TermRegistry.get_instance().get_all_terms():
+                contribs.update(getattr(t, "contributor_uris", []))
+            for val in sorted(contribs):
+                cls.createContributor(str(val))
             log.info(f"Loaded {len(cls.CONTRIBUTORS)} contributors")
 
     @classmethod

@@ -13,7 +13,10 @@ import rdflib
 
 import software
 
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.registry import TermRegistry
+from software.util.paths import DefaultInputLayout
+from software.data_model.loader import GraphLoader
+import util.schema as schema
 
 
 TYPECOUNT_UPPERBOUND = 1000
@@ -21,7 +24,7 @@ TYPECOUNT_LOWERBOUND = 500
 
 log = logging.getLogger(__name__)
 
-VOCABURI = sdotermsource.SdoTermSource.vocabUri()
+VOCABURI = schema.VOCABURI
 
 
 # Tests to probe the health of both schemas and code using graph libraries in
@@ -31,8 +34,10 @@ VOCABURI = sdotermsource.SdoTermSource.vocabUri()
 class SDOGraphSetupTestCase(unittest.TestCase):
     @classmethod
     def loadGraphs(self):
-        sdotermsource.SdoTermSource.loadSourceGraph("default")
-        self.rdflib_data = sdotermsource.SdoTermSource.sourceGraph()
+        layout = DefaultInputLayout()
+        loader = GraphLoader.from_layout(layout)
+        loader.load_all()
+        self.rdflib_data = TermRegistry.get_instance()._graph
 
     @classmethod
     def setUpClass(self):

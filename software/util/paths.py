@@ -88,7 +88,7 @@ class InputLayout:
         base_dir = self.domain_dir(domain)
         for p in patterns:
             globs = base_dir / p
-            files.extend([Path(path) for path in sorted(glob.glob(str(globs)))])
+            files.extend([Path(path) for path in sorted(glob.glob(str(globs), recursive=True))])
         return files
 
     def relative(self, path: Union[Path, str]) -> Path:

@@ -8,8 +8,9 @@ import unittest
 import software
 
 import SchemaExamples.schemaexamples as schemaexamples
-import SchemaTerms.sdoterm as sdoterm
+from software.data_model.models import SdoType
 import util.buildtermpages as buildtermpages
+import util.paths as paths
 import util.schema as schema
 
 
@@ -27,24 +28,19 @@ class TestTermFileName(unittest.TestCase):
     def testUpper(self):
         self.assertEqual(
             buildtermpages.termFileName("Thingamabob"),
-            os.path.abspath(os.path.join(
-                schema.config.OUTPUTDIR,
-                "terms/types/T/Thingamabob.html")))
+            str(paths.DefaultOutputLayout().domain_file(paths.Domain.TERMS, "types/T/Thingamabob.html"))
+        )
 
     def testLower(self):
         self.assertEqual(
             buildtermpages.termFileName("thingamabob"),
-            os.path.abspath(os.path.join(
-                schema.config.OUTPUTDIR,
-                "terms/properties/t/thingamabob.html"))
+            str(paths.DefaultOutputLayout().domain_file(paths.Domain.TERMS, "properties/t/thingamabob.html"))
         )
 
     def testDigit(self):
         self.assertEqual(
             buildtermpages.termFileName("4DStatue"),
-            os.path.abspath(os.path.join(
-                schema.config.OUTPUTDIR,
-                "terms/types/4/4DStatue.html"))
+            str(paths.DefaultOutputLayout().domain_file(paths.Domain.TERMS, "types/4/4DStatue.html"))
         )
 
 
@@ -59,8 +55,8 @@ class TestBuildTermPages(unittest.TestCase):
         )
 
     def testTemplateRenderNoExample(self):
-        term = sdoterm.SdoType(
-            term_id="42",
+        term = SdoType(
+            id="42",
             uri="http://example.com/whatchicallit",
             label="whatchicallit",
         )
@@ -82,8 +78,8 @@ class TestBuildTermPages(unittest.TestCase):
             )
         ]
         json = "[42]"
-        term = sdoterm.SdoType(
-            term_id="42",
+        term = SdoType(
+            id="42",
             uri="http://example.com/thingamabob",
             label="Thingamabob",
         )

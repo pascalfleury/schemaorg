@@ -19,8 +19,9 @@ from rdflib.compare import to_canonical_graph
 import rdflib.namespace
 import SchemaExamples.schemaexamples as schemaexamples
 import SchemaTerms.localmarkdown as localmarkdown
-import SchemaTerms.sdoterm as sdoterm
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.models import SdoTerm, SdoType, SdoProperty, SdoReference
+from software.data_model.type_map import SdoTermType
+from software.data_model.registry import TermRegistry
 import scripts.shex_shacl_shapes_exporter as shex_shacl_shapes_exporter
 import util.fileutils as fileutils
 import util.paths as paths
@@ -31,7 +32,7 @@ from util.sdoowl import OwlBuild
 from util.sort_dict import sort_dict, sort_xml
 import util.textutils as textutils
 
-VOCABURI: str = sdotermsource.SdoTermSource.vocabUri()
+VOCABURI: str = schema.VOCABURI
 log: logging.Logger = logging.getLogger(__name__)
 
 
@@ -44,12 +45,12 @@ def buildTurtleEquivs() -> str:
     outGraph.bind("schema_s", s_s)
     outGraph.bind("owl", rdflib.namespace.OWL)
 
-    all_terms: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllTerms(expanded=True)
-    t: Union[str, sdoterm.SdoTerm]
+    all_terms: List[Any] = TermRegistry.get_instance().get_all_terms()
+    t: Any
     for t in all_terms:
-        if isinstance(t, sdoterm.SdoTerm) and not t.retired:
+        if isinstance(t, SdoTerm) and not t.retired:
             eqiv: rdflib.URIRef = rdflib.namespace.OWL.equivalentClass
-            if t.termType == sdoterm.SdoTermType.PROPERTY:
+            if getattr(t, "termType", None) == SdoTermType.PROPERTY:
                 eqiv = rdflib.namespace.OWL.equivalentProperty
 
             p_uri: rdflib.URIRef = rdflib.URIRef(f"{s_p}{t.id}")
@@ -77,7 +78,7 @@ def jsonldtree(page: str) -> str:
 
 
 def _jsonldtree(tid: str, visitset: Set[str], term: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    termdesc: Optional[sdoterm.SdoTerm] = sdotermsource.SdoTermSource.getTerm(tid)
+    termdesc: Optional[SdoTerm] = TermRegistry.get_instance().get_by_id(tid)
     if not termdesc:
         return term or {}
 
@@ -90,7 +91,7 @@ def _jsonldtree(tid: str, visitset: Set[str], term: Optional[Dict[str, Any]] = N
     })
 
     if termdesc.supers:
-        sups: List[str] = [f"schema:{sup}" for sup in termdesc.supers.ids]
+        sups: List[str] = [f"schema:{sup.id}" for sup in termdesc.supers]
         term_dict["rdfs:subClassOf"] = sups[0] if len(sups) == 1 else sups
 
     if termdesc.pending:
@@ -101,7 +102,7 @@ def _jsonldtree(tid: str, visitset: Set[str], term: Optional[Dict[str, Any]] = N
     if tid not in visitset:
         visitset.add(tid)
         if termdesc.subs:
-            term_dict["children"] = [_jsonldtree(sub, visitset) for sub in termdesc.subs.ids]
+            term_dict["children"] = [_jsonldtree(sub.id, visitset) for sub in termdesc.subs]
     return term_dict
 
 
@@ -129,8 +130,8 @@ def sitemap(page: str) -> str:
     ]
 
     output: List[str] = ['<?xml version="1.0" encoding="utf-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n']
-    terms: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllTerms(suppressSourceLinks=True)
-    term: Union[str, sdoterm.SdoTerm]
+    terms = [t.id for t in TermRegistry.get_instance().get_all_terms() if not isinstance(t, SdoReference)]
+    term: Any
     for term in sorted(map(str, terms)):
         if not term.startswith(("http://", "https://")):
             output.append(node(term))
@@ -152,7 +153,7 @@ def protocolSwap(content: str, protocol: str, altprotocol: str) -> str:
 
 def protocols() -> Tuple[str, str]:
     """Return the protocols (http, https) in order of priority."""
-    return ("https", "http") if sdotermsource.SdoTermSource.vocabUri().startswith("https") else ("http", "https")
+    return ("https", "http") if schema.VOCABURI.startswith("https") else ("http", "https")
 
 
 ALL_GRAPH: Optional[rdflib.Graph] = None
@@ -163,15 +164,15 @@ def exportrdf(exportType: str, subdirectory_path: Optional[str] = None) -> None:
     global ALL_GRAPH, CURRENT_GRAPH
 
     if not ALL_GRAPH:
+        registry = TermRegistry.get_instance()
         ALL_GRAPH = rdflib.Graph()
         ALL_GRAPH.bind("schema", VOCABURI)
-        sdotermsource.bindNameSpaces(ALL_GRAPH)
 
         CURRENT_GRAPH = rdflib.Graph()
-        sdotermsource.bindNameSpaces(CURRENT_GRAPH)
         CURRENT_GRAPH.bind("schema", VOCABURI)
 
-        ALL_GRAPH += sdotermsource.SdoTermSource.sourceGraph()
+        if isinstance(registry._graph, rdflib.Graph):
+            ALL_GRAPH += registry._graph
         protocol: str
         protocol, _ = protocols()
 
@@ -301,8 +302,8 @@ def uriwrap(thing: Any) -> str:
         return ""
     if isinstance(thing, str):
         return thing if thing.startswith(("http:", "https:")) else f"{VOCABURI}{thing}"
-    if isinstance(thing, (sdoterm.SdoTermSequence, sdoterm.SdoTermOrId, sdoterm.SdoTerm)):
-        return uriwrap(getattr(thing, "ids", getattr(thing, "id", None)))
+    if isinstance(thing, SdoTerm):
+        return uriwrap(thing.id)
     try:
         return textutils.Array2String(sorted(map(uriwrap, thing)))
     except (TypeError, ValueError) as e:
@@ -321,38 +322,39 @@ def exportcsv(page: str) -> None:
     typedata_all: List[Dict[str, str]] = []
     propdata: List[Dict[str, str]] = []
     propdata_all: List[Dict[str, str]] = []
-    terms: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllTerms(expanded=True, suppressSourceLinks=True)
+    terms_all = TermRegistry.get_instance().get_all_terms()
 
-    term: Union[str, sdoterm.SdoTerm]
-    for term in terms:
-        if not isinstance(term, sdoterm.SdoTerm) or term.termType == sdoterm.SdoTermType.REFERENCE or term.id.startswith(("http://", "https://")):
+    term_any: Any
+    for term_any in terms_all:
+        if not isinstance(term_any, SdoTerm) or isinstance(term_any, SdoReference) or term_any.id.startswith(("http://", "https://")):
             continue
 
         row: Dict[str, str] = {
-            "id": term.uri, "label": term.label, "comment": term.comment,
-            "supersedes": uriwrap(term.supersedes), "supersededBy": uriwrap(term.supersededBy),
-            "isPartOf": f"{protocol}://{term.extLayer}.schema.org" if term.extLayer else ""
+            "id": str(term_any.uri), "label": term_any.label, "comment": term_any.comment or "",
+            "supersedes": uriwrap(term_any.supersedes), "supersededBy": uriwrap(term_any.supersededBy),
+            "isPartOf": f"{protocol}://{term_any.extLayer}.schema.org" if term_any.extLayer else ""
         }
 
-        if term.termType == sdoterm.SdoTermType.PROPERTY:
+        if isinstance(term_any, SdoProperty):
             row.update({
-                "subPropertyOf": uriwrap(term.supers), "equivalentProperty": uriwrap(term.equivalents.ids),
-                "subproperties": uriwrap(term.subs.ids), "domainIncludes": uriwrap(term.domainIncludes.ids),
-                "rangeIncludes": uriwrap(term.rangeIncludes.ids), "inverseOf": uriwrap(term.inverse.id)
+                "subPropertyOf": uriwrap(term_any.supers), "equivalentProperty": uriwrap(term_any.equivalents),
+                "subproperties": uriwrap(term_any.subs), "domainIncludes": uriwrap(term_any.domainIncludes),
+                "rangeIncludes": uriwrap(term_any.rangeIncludes), "inverseOf": uriwrap(getattr(term_any.inverse, "id", ""))
             })
             propdata_all.append(row)
-            if not term.retired: propdata.append(row)
-        else:
+            if not term_any.retired: propdata.append(row)
+        elif isinstance(term_any, SdoType):
             row.update({
-                "subTypeOf": uriwrap(term.supers.ids), "equivalentClass": uriwrap(term.equivalents.ids),
-                "subTypes": uriwrap(term.subs.ids)
+                "subTypeOf": uriwrap(term_any.supers), "equivalentClass": uriwrap(term_any.equivalents),
+                "subTypes": uriwrap(term_any.subs)
             })
-            if term.termType == sdoterm.SdoTermType.ENUMERATIONVALUE:
-                row["enumerationtype"] = uriwrap(term.enumerationParent.id)
+            if getattr(term_any, "termType", None) == SdoTermType.ENUMERATIONVALUE:
+                parent = getattr(term_any, "enumerationParent", None)
+                row["enumerationtype"] = uriwrap(getattr(parent, "id", "")) if parent else ""
             else:
-                row["properties"] = uriwrap(term.allproperties.ids)
+                row["properties"] = uriwrap(getattr(term_any, "allproperties", []))
             typedata_all.append(row)
-            if not term.retired: typedata.append(row)
+            if not term_any.retired: typedata.append(row)
 
     writecsvout("properties", propdata, prop_fields, fileutils.FileSelector.CURRENT, protocol, altprotocol)
     writecsvout("properties", propdata_all, prop_fields, fileutils.FileSelector.ALL, protocol, altprotocol)
@@ -377,7 +379,7 @@ def writecsvout(ftype: str, data: List[Dict[str, str]], fields: List[str], selec
 
 
 def jsoncounts(page: str) -> str:
-    counts: Dict[str, Any] = sdotermsource.SdoTermSource.termCounts()
+    counts: Dict[str, Any] = TermRegistry.get_instance().termCounts()
     counts["schemaorgversion"] = schema.getVersion()
     return json.dumps(sort_dict(counts))
 

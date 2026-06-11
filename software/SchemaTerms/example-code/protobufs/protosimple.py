@@ -8,22 +8,21 @@ if os.getcwd() not in sys.path:
     sys.path.insert(1, os.getcwd())
 import software
 
-from SchemaTerms.sdotermsource import *
-from SchemaTerms.sdoterm import *
+from software.util.paths import DefaultInputLayout
+from software.data_model.loader import GraphLoader
+from software.data_model.registry import TermRegistry
 from SchemaTerms.localmarkdown import Markdown
 
 Markdown.setWikilinkCssClass("localLink")
 Markdown.setWikilinkPrePath("/")
 
 
-DATADIR = os.path.join(os.path.dirname(__file__), "../data")
-triplesfile = os.path.join(DATADIR, "schemaorg-all-http.nt")
-SdoTermSource.VOCABURI = "https://schema.org/" #Force to https as loaded https file
-SdoTermSource.loadSourceGraph(triplesfile)
-print ("loaded %s triples" % len(SdoTermSource.sourceGraph()))
-
-terms = SdoTermSource.getAllTerms()
-print ("Terms Count: %s" % len(terms))
+layout = DefaultInputLayout()
+loader = GraphLoader.from_layout(layout)
+loader.load_all()
+registry = TermRegistry.get_instance()
+terms = [t.id for t in registry.all_terms().values() if t.id]
+print("Terms Count: %s" % len(terms))
 
 from schematermsprotobuf import sdotermToProtobuf, sdotermToProtobufMsg, sdotermToProtobufText, protobufToMsg, protobufToText
 
@@ -33,7 +32,8 @@ start = datetime.datetime.now() #debug
 for t in terms:
     tic = datetime.datetime.now() #debug
 
-    term = SdoTermSource.getTerm(t,expanded=False)
+    term = registry.get_by_id(t)
+    if not term: continue
     buf = sdotermToProtobuf(term)
     msg = protobufToMsg(buf)
     txt = protobufToText(buf)

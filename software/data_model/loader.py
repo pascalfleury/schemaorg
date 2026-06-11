@@ -5,7 +5,7 @@ import logging
 from typing import Dict, List, Optional, Set, Type, Union, Any
 
 from rdflib import Graph, RDF, RDFS, URIRef
-
+from util.paths import InputLayout, Domain
 from util.schema import URI
 from .models import SdoType, SdoDataType, SdoEnumeration, SdoEnumerationvalue, SdoProperty, SdoTerm
 from .registry import TermRegistry
@@ -18,6 +18,25 @@ class GraphLoader:
     def __init__(self, graph: Graph, registry: Optional[TermRegistry] = None):
         self.graph = graph
         self.registry = registry or TermRegistry.get_instance()
+        self.registry._graph = graph
+
+    @classmethod
+    def from_layout(cls, layout: InputLayout, vocaburi: Optional[str] = None) -> "GraphLoader":
+        import util.schema as schema
+        if vocaburi:
+            schema.setVocabUri(vocaburi)
+        g = Graph()
+        files = layout.domain_files(Domain.DATA, ["*.ttl", "ext/**/*.ttl"])
+        for f in sorted(files):
+            try:
+                g.parse(str(f), format="turtle")
+            except Exception as e:
+                log.warning(f"Failed to parse {f}: {e}")
+        g.bind("schema", schema.URI)
+        g.bind("rdfs", RDFS)
+        g.bind("rdf", RDF)
+        g.bind("owl", URIRef("http://www.w3.org/2002/07/owl#"))
+        return cls(g)
 
     def load_all(self) -> int:
         """Loads all Schema.org entities from the graph into the registry efficiently."""
@@ -31,20 +50,21 @@ class GraphLoader:
         query_types = f"""
         SELECT ?term ?type WHERE {{
             ?term a ?type .
-            FILTER(?type IN (<{RDFS.Class}>, <{RDF.Property}>, <{URI.DataType}>))
+            FILTER(?type IN (<{RDFS.Class}>, <{RDF.Property}>, <http://schema.org/DataType>, <https://schema.org/DataType>))
         }}
         """
         for row in self.graph.query(query_types):
-            uri = row.term
+            row_any: Any = row
+            uri = row_any.term
             if isinstance(uri, URIRef):
-                term_types.setdefault(uri, set()).add(row.type)
+                term_types.setdefault(uri, set()).add(row_any.type)
                 term_data.setdefault(uri, {"uri": uri})
 
         # 2. Fetch all metadata and relations in bulk
         query_data = f"""
         SELECT ?term ?p ?o WHERE {{
             ?term a ?type .
-            FILTER(?type IN (<{RDFS.Class}>, <{RDF.Property}>, <{URI.DataType}>))
+            FILTER(?type IN (<{RDFS.Class}>, <{RDF.Property}>, <http://schema.org/DataType>, <https://schema.org/DataType>))
             ?term ?p ?o .
         }}
         """
@@ -67,8 +87,9 @@ class GraphLoader:
         }
 
         for row in self.graph.query(query_data):
-            uri, p, o = row.term, row.p, row.o
-            if p in field_map:
+            row_any2: Any = row
+            uri, p, o = row_any2.term, row_any2.p, row_any2.o
+            if p in field_map and isinstance(uri, URIRef):
                 field = field_map[p]
                 data = term_data.setdefault(uri, {"uri": uri})
                 
@@ -80,19 +101,22 @@ class GraphLoader:
 
         # 3. Instantiate and register Class/Property terms
         for uri, data in term_data.items():
+            if "schema.org" not in str(uri):
+                continue
             types = term_types.get(uri, set())
             
             # Ensure mandatory fields have at least a default if missing in graph
             if "label" not in data:
                 data["label"] = str(uri).split("/")[-1].split("#")[-1]
 
+            obj: Any = None
             try:
                 if RDF.Property in types:
                     obj = SdoProperty.model_validate(data)
-                elif RDFS.Class in types or URI.DataType in types:
-                    if URI.DataType in types or self._is_subclass_of(uri, URI.DataType):
+                elif RDFS.Class in types or URI.DataType in types or URIRef("https://schema.org/DataType") in types:
+                    if URI.DataType in types or URIRef("https://schema.org/DataType") in types or self._is_subclass_of(uri, URI.DataType) or self._is_subclass_of(uri, URIRef("https://schema.org/DataType")):
                         obj = SdoDataType.model_validate(data)
-                    elif self._is_subclass_of(uri, URI.Enumeration):
+                    elif self._is_subclass_of(uri, URI.Enumeration) or self._is_subclass_of(uri, URIRef("https://schema.org/Enumeration")):
                         obj = SdoEnumeration.model_validate(data)
                     else:
                         obj = SdoType.model_validate(data)
@@ -108,26 +132,30 @@ class GraphLoader:
         # We need to find classes that are subclasses of Enumeration
         query_enums = f"""
         SELECT ?val ?enum ?label ?comment ?isPartOf WHERE {{
-            ?enum <{RDFS.subClassOf}>* <{URI.Enumeration}> .
+            ?enum <{RDFS.subClassOf}>* ?rootEnum .
+            FILTER(?rootEnum IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>))
             ?val a ?enum .
+            FILTER(?enum NOT IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>))
             OPTIONAL {{ ?val <{RDFS.label}> ?label }}
             OPTIONAL {{ ?val <{RDFS.comment}> ?comment }}
             OPTIONAL {{ ?val <{URI.isPartOf}> ?isPartOf }}
+            OPTIONAL {{ ?val <https://schema.org/isPartOf> ?isPartOf }}
         }}
         """
         for row in self.graph.query(query_enums):
-            uri = row.val
+            row_any3: Any = row
+            uri = row_any3.val
             if isinstance(uri, URIRef):
-                if uri in self.registry.all_terms():
+                if "schema.org" not in str(uri) or uri in self.registry.all_terms():
                     continue
                     
                 try:
                     val = SdoEnumerationvalue.model_validate({
                         "uri": uri,
-                        "label": str(row.label or str(uri).split("/")[-1]),
-                        "comment": str(row.comment or ""),
-                        "isPartOf": row.isPartOf,
-                        "enumeration_uri": row.enum
+                        "label": str(row_any3.label or str(uri).split("/")[-1]),
+                        "comment": str(row_any3.comment or ""),
+                        "isPartOf": row_any3.isPartOf,
+                        "enumeration_uri": row_any3.enum
                     })
                     self._enrich_metadata(val)
                     self.registry.register(val)

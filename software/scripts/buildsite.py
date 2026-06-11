@@ -24,7 +24,8 @@ import SchemaExamples.schemaexamples as schemaexamples
 import SchemaExamples.utils.assign_example_ids
 import SchemaTerms.localmarkdown
 import SchemaTerms.sdocollaborators as sdocollaborators
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.loader import GraphLoader
+from software.data_model.registry import TermRegistry
 import scripts.buildfiles as buildfiles
 import scripts.runtests as runtests_lib
 import util.buildocspages as buildocspages
@@ -254,12 +255,18 @@ def loadTerms(source: Optional[str] = None, force: bool = False) -> None:
     init_graph: bool = (LOADEDTERMS is not None) or force
     LOADEDTERMS = source
     
-    if not sdotermsource.SdoTermSource.SOURCEGRAPH or init_graph:
+    registry = TermRegistry.get_instance()
+    if not getattr(registry, "_graph", None) or init_graph:
+        if init_graph:
+            TermRegistry.reset()
+            registry = TermRegistry.get_instance()
         if source == "default":
             with pretty_logger.BlockLog(logger=log, message="Loading development triples files (default)"):
-                sdotermsource.SdoTermSource.loadSourceGraph("default", init=init_graph)
+                layout = paths.DefaultInputLayout()
+                loader = GraphLoader.from_layout(layout)
+                loader.load_all()
         elif source == "release":
-            protocol: str = "https" if sdotermsource.SdoTermSource.vocabUri().startswith("https") else "http"
+            protocol: str = "https" if schema.VOCABURI.startswith("https") else "http"
             release_file: Path = paths.DefaultInputLayout().release_file(protocol)
             
             if not release_file.exists():
@@ -269,7 +276,11 @@ def loadTerms(source: Optional[str] = None, force: bool = False) -> None:
                 )
                 
             with pretty_logger.BlockLog(logger=log, message=f"Loading triples from release file {release_file}"):
-                sdotermsource.SdoTermSource.loadSourceGraph(str(release_file), init=init_graph)
+                import rdflib
+                g = rdflib.Graph()
+                g.parse(str(release_file), format="turtle")
+                loader = GraphLoader(g, registry)
+                loader.load_all()
         else:
             raise ValueError(f"Invalid term source: {source}")
         

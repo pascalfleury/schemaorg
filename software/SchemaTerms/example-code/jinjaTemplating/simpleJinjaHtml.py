@@ -14,28 +14,22 @@ if os.getcwd() not in sys.path:
 import software
 
 from SchemaTerms.localmarkdown import Markdown
-from SchemaTerms.sdoterm import *
-from SchemaTerms.sdotermsource import *
+from software.util.paths import DefaultInputLayout
+from software.data_model.loader import GraphLoader
+from software.data_model.registry import TermRegistry
+from software.data_model.type_map import SdoTermType
 
 
 Markdown.setWikilinkCssClass("localLink")
 Markdown.setWikilinkPrePath("/")
 
 
-DATADIR = os.path.join(os.path.dirname(__file__), "../data")
-if SdoTermSource.vocabUri().startswith("https://"):
-    triplesfile = os.path.join(DATADIR, "schemaorg-all-https.nt")
-else:
-    triplesfile = os.path.join(DATADIR, "schemaorg-all-http.nt")
-
-termgraph = rdflib.Graph()
-termgraph.parse(triplesfile, format="nt")
-
-print("loaded %s triples" % len(termgraph))
-
-SdoTermSource.setSourceGraph(termgraph)
-print("Types Count: %s" % len(SdoTermSource.getAllTypes(expanded=False)))
-print("Properties Count: %s" % len(SdoTermSource.getAllProperties(expanded=False)))
+layout = DefaultInputLayout()
+loader = GraphLoader.from_layout(layout)
+loader.load_all()
+registry = TermRegistry.get_instance()
+print("Types Count: %s" % len(registry.get_all_types()))
+print("Properties Count: %s" % len(registry.get_all_properties()))
 
 ###################################################
 # JINJA INITIALISATION
@@ -108,7 +102,8 @@ lastCount = 0
 for t in terms:
     tic = datetime.datetime.now()  # diagnostics
 
-    term = SdoTermSource.getTerm(t, expanded=True)
+    term = registry.get_by_id(t)
+    if not term: continue
     pageout = templateRender(term)
     filename = os.path.join(os.path.dirname(__file__), "html", term.id + ".html")
     f = open(filename, "w")
@@ -116,7 +111,7 @@ for t in terms:
     f.close()
 
     # diagnostics ##########################################
-    termsofar = len(SdoTermSource.termCache())  # diagnostics
+    termsofar = len(registry)  # diagnostics
     termscreated = termsofar - lastCount  # diagnostics
     lastCount = termsofar  # diagnostics
     print("Term: %s (%d) - %s" % (t, termscreated, str(datetime.datetime.now() - tic)))  # diagnostics

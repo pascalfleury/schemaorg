@@ -14,8 +14,9 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set,
 import software
 
 import SchemaTerms.sdocollaborators as sdocollaborators
-import SchemaTerms.sdoterm as sdoterm
-import SchemaTerms.sdotermsource as sdotermsource
+from software.data_model.models import SdoTerm, SdoType, SdoProperty
+from software.data_model.type_map import SdoTermType
+from software.data_model.registry import TermRegistry
 import scripts.buildtermlist as buildtermlist
 import util.fileutils as fileutils
 import util.jinga_render as jinga_render
@@ -42,7 +43,7 @@ def schemasPage(page: str) -> str:
     extra_vars: Dict[str, Any] = {
         "home_page": "False",
         "title": "Schemas",
-        "termcounts": sdotermsource.SdoTermSource.termCounts(),
+        "termcounts": TermRegistry.get_instance().termCounts(),
     }
     return docsTemplateRender("docs/Schemas.j2", extra_vars)
 
@@ -67,14 +68,14 @@ def homePage(page: str) -> str:
     if config:
         title, template, filt, overrideclassval = config
 
-    sectionterms: Dict[str, Dict[sdoterm.SdoTermType, List[sdoterm.SdoTerm]]] = {}
+    sectionterms: Dict[str, Dict[SdoTermType, List[SdoTerm]]] = {}
     termcount: int = 0
     if filt:
-        all_terms: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllTerms(layer=filt, expanded=True)
-        terms: List[sdoterm.SdoTerm] = []
-        t: Union[str, sdoterm.SdoTerm]
+        all_terms: Sequence[Any] = TermRegistry.get_instance().get_all_terms(layer=filt)
+        terms: List[SdoTerm] = []
+        t: Any
         for t in all_terms:
-            if isinstance(t, sdoterm.SdoTerm):
+            if isinstance(t, SdoTerm):
                 t.cat = ""  # type: ignore
                 if filt == "pending":
                     s: str
@@ -98,15 +99,16 @@ def homePage(page: str) -> str:
     return ret
 
 
-def buildTermCatList(terms: Iterable[sdoterm.SdoTerm], checkCat: bool = False) -> Tuple[Dict[str, Dict[sdoterm.SdoTermType, List[sdoterm.SdoTerm]]], int]:
-    termcat: Dict[str, Dict[sdoterm.SdoTermType, List[sdoterm.SdoTerm]]] = defaultdict(lambda: defaultdict(list))
+def buildTermCatList(terms: Iterable[SdoTerm], checkCat: bool = False) -> Tuple[Dict[str, Dict[SdoTermType, List[SdoTerm]]], int]:
+    termcat: Dict[str, Dict[SdoTermType, List[SdoTerm]]] = defaultdict(lambda: defaultdict(list))
     termcount: int = 0
-    t: sdoterm.SdoTerm
+    t: SdoTerm
     for t in terms:
-        if t.termType == sdoterm.SdoTermType.REFERENCE:
+        if getattr(t, "termType", None) == SdoTermType.REFERENCE:
             continue
         cat: str = getattr(t, 'cat', '') if checkCat else ""
-        termcat[cat][t.termType].append(t)
+        if t.termType:
+            termcat[cat][t.termType].append(t)
         termcount += 1
 
     return dict(sorted(termcat.items())), termcount
@@ -118,7 +120,7 @@ class UnknownTermError(LookupError):
 
 class listingNode:
     def __init__(self, term: str, depth: int = 0, title: str = "", parent: Optional["listingNode"] = None, visit_set: Optional[Set[str]] = None) -> None:
-        termdesc: Optional[sdoterm.SdoTerm] = sdotermsource.SdoTermSource.getTerm(term)
+        termdesc: Optional[SdoTerm] = TermRegistry.get_instance().get_by_id(term)
         if not termdesc:
             raise UnknownTermError(f"No description for term {term}")
         visit_set = visit_set if visit_set is not None else set()
@@ -127,7 +129,7 @@ class listingNode:
         self.parent: Optional[listingNode] = parent
         self.title: str = title
         self.id: str = termdesc.label
-        self.termType: sdoterm.SdoTermType = termdesc.termType
+        self.termType: Optional[SdoTermType] = termdesc.termType
         self.depth: int = depth
         self.retired: bool = termdesc.retired
         self.pending: bool = termdesc.pending
@@ -135,9 +137,9 @@ class listingNode:
         if self.id not in visit_set:
             visit_set.add(self.id)
             child_ids: List[str] = []
-            if termdesc.termType == sdoterm.SdoTermType.ENUMERATION:
-                child_ids.extend(sorted(termdesc.enumerationMembers.ids))
-            child_ids.extend(sorted(termdesc.subs.ids))
+            if termdesc.termType == SdoTermType.ENUMERATION:
+                child_ids.extend(sorted([m.id for m in getattr(termdesc, "enumerationMembers", [])]))
+            child_ids.extend(sorted([s.id for s in getattr(termdesc, "subs", [])]))
 
             child_id: str
             for child_id in child_ids:
@@ -163,7 +165,7 @@ def jsonldtree(page: str) -> str:
 
 def _jsonldtree(tid: str, visitset: Set[str], term: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     try:
-        termdesc: Optional[sdoterm.SdoTerm] = sdotermsource.SdoTermSource.getTerm(tid)
+        termdesc: Optional[SdoTerm] = TermRegistry.get_instance().get_by_id(tid)
         if not termdesc:
             raise UnknownTermError(f"No description for term {tid}")
 
@@ -176,7 +178,7 @@ def _jsonldtree(tid: str, visitset: Set[str], term: Optional[Dict[str, Any]] = N
         })
 
         if termdesc.supers:
-            sups: List[str] = [f"schema:{sup}" for sup in termdesc.supers.ids]
+            sups: List[str] = [f"schema:{sup.id}" for sup in termdesc.supers]
             term_dict["rdfs:subClassOf"] = sups[0] if len(sups) == 1 else sups
 
         if termdesc.pending:
@@ -188,10 +190,10 @@ def _jsonldtree(tid: str, visitset: Set[str], term: Optional[Dict[str, Any]] = N
             visitset.add(tid)
             if termdesc.subs:
                 subs: List[Dict[str, Any]] = []
-                sub: str
-                for sub in termdesc.subs.ids:
+                sub: Any
+                for sub in termdesc.subs:
                     try:
-                        subs.append(_jsonldtree(tid=sub, visitset=visitset))
+                        subs.append(_jsonldtree(tid=sub.id, visitset=visitset))
                     except UnknownTermError as e:
                         log.warning(f"Error while building listing node for {sub}: {e}")
                 term_dict["children"] = subs
@@ -223,14 +225,14 @@ def fullPage(page: str) -> str:
 def fullReleasePage(page: str) -> str:
     node_listings: List[listingNode] = [listingNode("Thing", title="Type hierarchy")]
 
-    all_enum_vals: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllEnumerationvalues(expanded=True)
-    all_types: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllTypes(expanded=True)
+    all_enum_vals: Sequence[Any] = TermRegistry.get_instance().get_all_enumerationvalues()
+    all_types: Sequence[Any] = TermRegistry.get_instance().get_all_types()
 
-    types: List[sdoterm.SdoTerm] = [t for t in list(all_enum_vals) + list(all_types) if isinstance(t, sdoterm.SdoTerm)]
-    types = sorted(sdotermsource.SdoTermSource.expandTerms(types), key=lambda t: t.id)
+    types: List[SdoTerm] = [t for t in list(all_enum_vals) + list(all_types) if isinstance(t, SdoTerm)]
+    types = sorted(types, key=lambda t: t.id)
 
-    all_props: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllProperties(expanded=True)
-    properties: List[sdoterm.SdoTerm] = [p for p in all_props if isinstance(p, sdoterm.SdoTerm)]
+    all_props: Sequence[Any] = TermRegistry.get_instance().get_all_properties()
+    properties: List[SdoTerm] = [p for p in all_props if isinstance(p, SdoTerm)]
 
     extra_vars: Dict[str, Any] = {
         "home_page": "False",
@@ -256,7 +258,7 @@ def collabs(page: str) -> str:
 
 
 def createCollab(coll: sdocollaborators.collaborator) -> None:
-    terms: Dict[str, Dict[sdoterm.SdoTermType, List[sdoterm.SdoTerm]]] = {}
+    terms: Dict[str, Dict[SdoTermType, List[SdoTerm]]] = {}
     termcount: int = 0
     if coll.contributor:
         terms, termcount = buildTermCatList(coll.getTerms())
