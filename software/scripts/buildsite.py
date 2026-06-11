@@ -197,10 +197,11 @@ def runtests() -> None:
         with pretty_logger.BlockLog(
             logger=log, message="Running test scripts before proceeding…"
         ):
-            errorcount: int = runtests_lib.main("./software/tests/")
-            if errorcount:
-                log.error(f"Errors returned: {errorcount}")
-                sys.exit(errorcount)
+            cmd = [sys.executable, "software/scripts/runtests.py"]
+            status = subprocess.call(cmd)
+            if status:
+                log.error(f"Errors returned: {status}")
+                sys.exit(status)
 
 
 def initdir(output_dir_str: str, handler_path: str) -> None:
