@@ -19,7 +19,7 @@ from rdflib.compare import to_canonical_graph
 import rdflib.namespace
 import SchemaExamples.schemaexamples as schemaexamples
 import SchemaTerms.localmarkdown as localmarkdown
-from software.data_model.models import SdoTerm, SdoType, SdoProperty, SdoReference
+from software.data_model.models import SdoTerm, SdoType, SdoProperty, SdoReference, SdoEnumerationvalue
 from software.data_model.type_map import SdoTermType
 from software.data_model.registry import TermRegistry
 import scripts.shex_shacl_shapes_exporter as shex_shacl_shapes_exporter
@@ -48,7 +48,7 @@ def buildTurtleEquivs() -> str:
     all_terms: List[Any] = TermRegistry.get_instance().get_all_terms()
     t: Any
     for t in all_terms:
-        if isinstance(t, SdoTerm) and not t.retired:
+        if isinstance(t, SdoTerm) and not t.retired and "schema.org" in str(t.uri):
             eqiv: rdflib.URIRef = rdflib.namespace.OWL.equivalentClass
             if getattr(t, "termType", None) == SdoTermType.PROPERTY:
                 eqiv = rdflib.namespace.OWL.equivalentProperty
@@ -319,7 +319,7 @@ def uriwrap(thing: Any) -> str:
     if isinstance(thing, str):
         return thing if thing.startswith(("http:", "https:")) else f"{VOCABURI}{thing}"
     if isinstance(thing, SdoTerm):
-        return uriwrap(thing.id)
+        return str(thing.uri)
     try:
         return textutils.Array2String(sorted(map(uriwrap, thing)))
     except (TypeError, ValueError) as e:
@@ -339,12 +339,14 @@ def exportcsv(page: str) -> None:
     propdata: List[Dict[str, str]] = []
     propdata_all: List[Dict[str, str]] = []
     terms_all = TermRegistry.get_instance().get_all_terms()
+    with open("terms_dump.txt", "w") as f:
+        for t in terms_all:
+            f.write(f"{getattr(t, 'id', 'NO_ID')} {type(t)} {getattr(t, 'termType', None)}\n")
 
     term_any: Any
     for term_any in terms_all:
-        if not isinstance(term_any, SdoTerm) or isinstance(term_any, SdoReference) or term_any.id.startswith(("http://", "https://")):
+        if not isinstance(term_any, SdoTerm) or isinstance(term_any, SdoReference) or term_any.id.startswith(("http://", "https://")) or "schema.org" not in str(term_any.uri):
             continue
-
         row: Dict[str, str] = {
             "id": str(term_any.uri), "label": term_any.label, "comment": term_any.comment or "",
             "supersedes": uriwrap(term_any.supersedes), "supersededBy": uriwrap(term_any.supersededBy),
@@ -359,7 +361,7 @@ def exportcsv(page: str) -> None:
             })
             propdata_all.append(row)
             if not term_any.retired: propdata.append(row)
-        elif isinstance(term_any, SdoType):
+        elif isinstance(term_any, (SdoType, SdoEnumerationvalue)):
             row.update({
                 "subTypeOf": uriwrap(term_any.supers), "equivalentClass": uriwrap(term_any.equivalents),
                 "subTypes": uriwrap(term_any.subs)

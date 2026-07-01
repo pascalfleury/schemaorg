@@ -155,7 +155,7 @@ def buildTerms(term_ids: Iterable[str], config: Optional[Dict[str, Any]] = None)
     tic: float = time.perf_counter()
     if any(fileutils.isAll(tid) for tid in term_ids):
         log.info("Loading all term identifiers")
-        term_ids = [t.id for t in TermRegistry.get_instance().get_all_terms() if not isinstance(t, SdoReference)]
+        term_ids = [t.id for t in TermRegistry.get_instance().get_all_terms() if not isinstance(t, SdoReference) and "schema.org" in str(t.uri)]
 
     term_list: List[str] = list(term_ids)
     if not term_list:

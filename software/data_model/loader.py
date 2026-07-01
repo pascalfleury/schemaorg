@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Set, Type, Union, Any
 
 from rdflib import Graph, RDF, RDFS, URIRef
 from util.paths import InputLayout, Domain
+import util.schema as schema
 from util.schema import URI
 from .models import SdoType, SdoDataType, SdoEnumeration, SdoEnumerationvalue, SdoProperty, SdoTerm
 from .registry import TermRegistry
@@ -101,13 +102,19 @@ class GraphLoader:
 
         # 3. Instantiate and register Class/Property terms
         for uri, data in term_data.items():
-            if "schema.org" not in str(uri):
-                continue
+            is_schema = "schema.org" in str(uri)
             types = term_types.get(uri, set())
             
             # Ensure mandatory fields have at least a default if missing in graph
             if "label" not in data:
-                data["label"] = str(uri).split("/")[-1].split("#")[-1]
+                if is_schema:
+                    data["label"] = str(uri).split("/")[-1].split("#")[-1]
+                else:
+                    try:
+                        qname = self.graph.namespace_manager.compute_qname(uri)
+                        data["label"] = f"{qname[0]}:{qname[2]}"
+                    except Exception:
+                        data["label"] = str(uri).split("/")[-1].split("#")[-1]
 
             obj: Any = None
             try:
@@ -132,10 +139,16 @@ class GraphLoader:
         # We need to find classes that are subclasses of Enumeration
         query_enums = f"""
         SELECT ?val ?enum ?label ?comment ?isPartOf WHERE {{
-            ?enum <{RDFS.subClassOf}>* ?rootEnum .
-            FILTER(?rootEnum IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>))
+            {{
+                ?enum <{RDFS.subClassOf}>* ?rootEnum .
+                FILTER(?rootEnum IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>))
+            }} UNION {{
+                ?enum <{RDFS.subClassOf}>* ?parent .
+                ?parent a ?dataTypeClass .
+                FILTER(?dataTypeClass IN (<http://schema.org/DataType>, <https://schema.org/DataType>))
+            }}
             ?val a ?enum .
-            FILTER(?enum NOT IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>))
+            FILTER(?enum NOT IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>, <http://schema.org/DataType>, <https://schema.org/DataType>))
             OPTIONAL {{ ?val <{RDFS.label}> ?label }}
             OPTIONAL {{ ?val <{RDFS.comment}> ?comment }}
             OPTIONAL {{ ?val <{URI.isPartOf}> ?isPartOf }}
@@ -167,21 +180,15 @@ class GraphLoader:
     def _enrich_metadata(self, term: SdoTerm):
         """Adds system metadata (layer, pending, retired) to a term."""
         if term.isPartOf:
-            uri_str = str(term.isPartOf)
-            if "pending" in uri_str:
-                term.layer = "pending"
-                term.pending = True
-            elif "attic" in uri_str:
-                term.layer = "attic"
-                term.retired = True
+            layer = schema.layerFromUri(str(term.isPartOf))
+            if layer:
+                term.layer = layer
+                if layer == "pending":
+                    term.pending = True
+                elif layer == "attic":
+                    term.retired = True
             else:
-                # Handle cases like http://bib.schema.org/
-                parts = uri_str.rstrip("/").split("/")
-                last = parts[-1]
-                if "." in last:
-                    term.layer = last.split(".")[-2]
-                else:
-                    term.layer = last
+                term.layer = "core"
         else:
             term.layer = "core"
 

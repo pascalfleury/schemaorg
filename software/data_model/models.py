@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 from typing import Annotated, List, Optional, Union, ClassVar, Any, Dict, Set
-from pydantic import Field, ConfigDict, computed_field
+from pydantic import Field, ConfigDict, computed_field, field_validator
 from pydantic_rdf import BaseRdfModel, WithPredicate
 from rdflib import RDFS, RDF, URIRef
 import util.schema as schema
@@ -36,6 +36,15 @@ class SdoTerm(BaseRdfModel):
 
     label: Annotated[str, WithPredicate(RDFS.label)]
     comment: Annotated[Optional[str], WithPredicate(RDFS.comment)] = ""
+
+    @field_validator('comment', mode='before')
+    @classmethod
+    def convert_markdown(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from SchemaTerms.localmarkdown import Markdown
+            parsed = Markdown.parse(v)
+            return parsed.strip() if parsed else parsed
+        return v
     isPartOf: Annotated[Optional[URIRef], WithPredicate(schema.URI.isPartOf)] = None
     
     source_uris: Annotated[List[URIRef], WithPredicate(schema.URI.source)] = Field(default_factory=list)
@@ -147,8 +156,10 @@ class SdoTerm(BaseRdfModel):
         from .registry import TermRegistry
         registry = TermRegistry.get_instance()
         res = []
+        print(f"DEBUG: supers called for {self.id}, super_uris: {getattr(self, 'super_uris', None)}")
         for u in getattr(self, "super_uris", []):
             t = registry.get(u)
+            print(f"  u: {u}, registry.get(u): {t}")
             if not t and "schema.org" in str(u):
                 stem = str(u).split("/")[-1].split("#")[-1]
                 t = self.__class__(id=stem, uri=str(u), label=stem)
@@ -168,6 +179,14 @@ class SdoTerm(BaseRdfModel):
             t for t in registry.all_terms().values()
             if isinstance(t, type(self)) and self.uri in getattr(t, "super_uris", [])
         ]
+        if isinstance(self, SdoDataType):
+            for t in registry.all_terms().values():
+                if isinstance(t, SdoEnumerationvalue) and getattr(t, "enumeration_uri", None) == self.uri:
+                    res.append(t)
+            if self.id == "DataType":
+                for t in registry.all_terms().values():
+                    if isinstance(t, SdoDataType) and t.id != "DataType":
+                        res.append(t)
         return TermList(sorted(res, key=lambda x: x.id))
 
     @subs.setter
@@ -317,12 +336,6 @@ class SdoDataType(SdoType):
 
 class SdoEnumeration(SdoType):
     """Model for Schema.org Enumerations."""
-    @property
-    def supers(self) -> TermList:
-        if self.id == "Enumeration":
-            return TermList()
-        res = [t for t in super().supers if isinstance(t, self.__class__) or getattr(t, "id", "") == "Enumeration"]
-        return TermList(res)
 
     @property
     def enumerationMembers(self) -> TermList:

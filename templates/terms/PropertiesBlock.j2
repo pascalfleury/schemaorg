@@ -5,7 +5,9 @@
 {{ set_local_var(local_vars,"propstodisplay", False)}}
 {% if term.properties|length > 0 %}{{set_local_var(local_vars,"propstodisplay", True)}}{% endif %}
 {% for t in term.termStack.terms %}
-    {% if t.properties|length > 0 %}{{set_local_var(local_vars,"propstodisplay", True)}}{% endif %}
+    {% if TERMTYPE != "Enumeration Type" or (t.id != "Thing" and t.id != "Intangible") %}
+        {% if t.properties|length > 0 %}{{set_local_var(local_vars,"propstodisplay", True)}}{% endif %}
+    {% endif %}
 {% endfor %}
 
 {% if local_vars.propstodisplay %}
@@ -16,7 +18,9 @@
     {% set propertiesFor = term %}{% include 'terms/PropertiesForTerm.j2' with context %}
 
     {% for t in term.termStack.terms %}
-        {% set propertiesFor = t %}{% include 'terms/PropertiesForTerm.j2' with context %}
+        {% if TERMTYPE != "Enumeration Type" or (t.id != "Thing" and t.id != "Intangible") %}
+            {% set propertiesFor = t %}{% include 'terms/PropertiesForTerm.j2' with context %}
+        {% endif %}
     {% endfor %}
 
    </table>

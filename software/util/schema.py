@@ -154,9 +154,12 @@ def layerFromUri(uri: Optional[str]) -> Optional[str]:
     if "attic" in uri_str: return "attic"
     if uri_str.startswith("https://schema.org/"):
         return None
-    match = re.match(r"https?://([^.]+)\.schema\.org/", uri_str)
+    match = re.match(r"https?://([^.]+)\.schema\.org/?", uri_str)
     if match:
-        return match.group(1)
+        layer = match.group(1)
+        if layer == "health-lifesci":
+            return None
+        return layer
     return None
 
 def uriFromLayer(layer: Optional[str] = None) -> str:
