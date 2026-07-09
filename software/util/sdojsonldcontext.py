@@ -46,6 +46,8 @@ def createcontext() -> str:
         if getattr(registry, "_graph", None):
             for pref, path in registry._graph.namespaces():
                 pref_str: str = str(pref)
+                if pref_str.startswith("ns") and pref_str[2:].isdigit():
+                    continue
                 if pref_str not in done_namespaces:
                     done_namespaces.add(pref_str)
                     if pref_str == "schema":
@@ -59,6 +61,8 @@ def createcontext() -> str:
             if not isinstance(term, SdoTerm) or isinstance(term, SdoReference):
                 continue
             if getattr(term, "termType", None) == SdoTermType.REFERENCE:
+                continue
+            if not "schema.org" in str(term.uri):
                 continue
             term_json: Dict[str, Any] = {"@id": schema.prefixedIdFromUri(term.uri)}
             if getattr(term, "termType", None) == SdoTermType.PROPERTY:

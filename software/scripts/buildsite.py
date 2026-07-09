@@ -242,6 +242,8 @@ LOADEDTERMS: Optional[str] = None
 def loadTerms(source: Optional[str] = None, force: bool = False) -> None:
     global LOADEDTERMS
 
+    SchemaTerms.localmarkdown.Markdown.setWikilinkPrePath("/")
+
     # If no source is requested, and we already loaded something, we're done.
     if source is None:
         if LOADEDTERMS is not None:

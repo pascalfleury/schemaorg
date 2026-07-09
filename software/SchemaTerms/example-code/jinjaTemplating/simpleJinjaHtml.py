@@ -58,7 +58,7 @@ def templateRender(term):
 
     page = None
 
-    if term.expanded():
+    if term.expanded:
         if term.termType == SdoTermType.TYPE:
             page = "expanded/TypePageEx.tpl"
         elif term.termType == SdoTermType.PROPERTY:

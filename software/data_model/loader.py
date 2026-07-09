@@ -13,6 +13,65 @@ from .registry import TermRegistry
 
 log: logging.Logger = logging.getLogger(__name__)
 
+NAMESPACES: Dict[str, str] = {
+    "dc": "http://purl.org/dc/elements/1.1/",
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "dct": "http://purl.org/dc/terms/",
+    "dctype": "http://purl.org/dc/dcmitype/",
+    "foaf": "http://xmlns.com/foaf/0.1/",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "void": "http://rdfs.org/ns/void#",
+    "cmns-cls": "https://www.omg.org/spec/Commons/Classifiers/",
+    "cmns-col": "https://www.omg.org/spec/Commons/Collections/",
+    "cmns-dt": "https://www.omg.org/spec/Commons/DatesAndTimes/",
+    "cmns-ge": "https://www.omg.org/spec/Commons/GeopoliticalEntities/",
+    "cmns-id": "https://www.omg.org/spec/Commons/Identifiers/",
+    "cmns-loc": "https://www.omg.org/spec/Commons/Locations/",
+    "cmns-q": "https://www.omg.org/spec/Commons/Quantities/",
+    "cmns-txt": "https://www.omg.org/spec/Commons/Text/",
+    "lcc-3166-1": "https://www.omg.org/spec/LCC/Countries/ISO3166-1-CountryCodes/",
+    "lcc-4217": "https://www.omg.org/spec/LCC/Countries/ISO4217-CurrencyCodes/",
+    "lcc-lr": "https://www.omg.org/spec/LCC/Languages/LanguageRepresentation/",
+    "fibo-be-corp-corp": "https://spec.edmcouncil.org/fibo/ontology/BE/Corporations/Corporations/",
+    "fibo-be-ge-ge": "https://spec.edmcouncil.org/fibo/ontology/BE/GovernmentEntities/GovernmentEntities/",
+    "fibo-be-le-cb": "https://spec.edmcouncil.org/fibo/ontology/BE/LegalEntities/CorporateBodies/",
+    "fibo-be-le-lp": "https://spec.edmcouncil.org/fibo/ontology/BE/LegalEntities/LegalPersons/",
+    "fibo-be-nfp-nfp": "https://spec.edmcouncil.org/fibo/ontology/BE/NotForProfitOrganizations/NotForProfitOrganizations/",
+    "fibo-be-oac-cctl": "https://spec.edmcouncil.org/fibo/ontology/BE/OwnershipAndControl/CorporateControl/",
+    "fibo-fbc-dae-dbt": "https://spec.edmcouncil.org/fibo/ontology/FBC/DebtAndEquities/Debt/",
+    "fibo-fbc-pas-fpas": "https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/FinancialProductsAndServices/",
+    "fibo-fnd-acc-cur": "https://spec.edmcouncil.org/fibo/ontology/FND/Accounting/CurrencyAmount/",
+    "fibo-fnd-agr-ctr": "https://spec.edmcouncil.org/fibo/ontology/FND/Agreements/Contracts/",
+    "fibo-fnd-arr-doc": "https://spec.edmcouncil.org/fibo/ontology/FND/Arrangements/Documents/",
+    "fibo-fnd-arr-lif": "https://spec.edmcouncil.org/fibo/ontology/FND/Arrangements/Lifecycles/",
+    "fibo-fnd-dt-oc": "https://spec.edmcouncil.org/fibo/ontology/FND/DatesAndTimes/Occurrences/",
+    "fibo-fnd-org-org": "https://spec.edmcouncil.org/fibo/ontology/FND/Organizations/Organizations/",
+    "fibo-fnd-pas-pas": "https://spec.edmcouncil.org/fibo/ontology/FND/ProductsAndServices/ProductsAndServices/",
+    "fibo-fnd-plc-adr": "https://spec.edmcouncil.org/fibo/ontology/FND/Places/Addresses/",
+    "fibo-fnd-plc-fac": "https://spec.edmcouncil.org/fibo/ontology/FND/Places/Facilities/",
+    "fibo-fnd-plc-loc": "https://spec.edmcouncil.org/fibo/ontology/FND/Places/Locations/",
+    "fibo-fnd-pty-pty": "https://spec.edmcouncil.org/fibo/ontology/FND/Parties/Parties/",
+    "fibo-fnd-rel-rel": "https://spec.edmcouncil.org/fibo/ontology/FND/Relations/Relations/",
+    "fibo-pay-ps-ps": "https://spec.edmcouncil.org/fibo/ontology/PAY/PaymentServices/PaymentServices/",
+    "gleif-L1": "https://www.gleif.org/ontology/L1/",
+    "gs1": "https://ref.gs1.org/voc/",
+    "lcc-cr": "https://www.omg.org/spec/LCC/Countries/CountryRepresentation/",
+    "unece": "http://unece.org/vocab#",
+    "vcard": "http://www.w3.org/2006/vcard/ns#",
+    "bibo": "http://purl.org/ontology/bibo/",
+    "sarif": "http://sarif.info/",
+    "lrmoo": "http://iflastandards.info/ns/lrm/lrmoo/",
+    "snomed": "http://purl.bioontology.org/ontology/SNOMEDCT/",
+    "eli": "http://data.europa.eu/eli/ontology#",
+    "prov": "http://www.w3.org/ns/prov#",
+    "hydra": "http://www.w3.org/ns/hydra/core#",
+    "mo": "http://purl.org/ontology/mo/",
+    "og": "http://ogp.me/ns#",
+}
+
 class GraphLoader:
     """Loader to populate Pydantic models from an rdflib.Graph using bulk queries."""
 
@@ -20,6 +79,9 @@ class GraphLoader:
         self.graph = graph
         self.registry = registry or TermRegistry.get_instance()
         self.registry._graph = graph
+        self.graph.bind("schema", schema.URI)
+        for prefix, uri in NAMESPACES.items():
+            self.graph.bind(prefix, URIRef(uri))
 
     @classmethod
     def from_layout(cls, layout: InputLayout, vocaburi: Optional[str] = None) -> "GraphLoader":
@@ -33,11 +95,8 @@ class GraphLoader:
                 g.parse(str(f), format="turtle")
             except Exception as e:
                 log.warning(f"Failed to parse {f}: {e}")
-        g.bind("schema", schema.URI)
-        g.bind("rdfs", RDFS)
-        g.bind("rdf", RDF)
-        g.bind("owl", URIRef("http://www.w3.org/2002/07/owl#"))
         return cls(g)
+
 
     def load_all(self) -> int:
         """Loads all Schema.org entities from the graph into the registry efficiently."""
@@ -54,12 +113,10 @@ class GraphLoader:
             FILTER(?type IN (<{RDFS.Class}>, <{RDF.Property}>, <http://schema.org/DataType>, <https://schema.org/DataType>))
         }}
         """
-        for row in self.graph.query(query_types):
-            row_any: Any = row
-            uri = row_any.term
-            if isinstance(uri, URIRef):
-                term_types.setdefault(uri, set()).add(row_any.type)
-                term_data.setdefault(uri, {"uri": uri})
+        for term, type_ in self.graph.query(query_types):
+            if isinstance(term, URIRef):
+                term_types.setdefault(term, set()).add(type_)
+                term_data.setdefault(term, {"uri": term})
 
         # 2. Fetch all metadata and relations in bulk
         query_data = f"""
@@ -87,12 +144,10 @@ class GraphLoader:
             URIRef("http://www.w3.org/2002/07/owl#equivalentProperty"): "equivalent_property_uris",
         }
 
-        for row in self.graph.query(query_data):
-            row_any2: Any = row
-            uri, p, o = row_any2.term, row_any2.p, row_any2.o
-            if p in field_map and isinstance(uri, URIRef):
+        for term, p, o in self.graph.query(query_data):
+            if p in field_map and isinstance(term, URIRef):
                 field = field_map[p]
-                data = term_data.setdefault(uri, {"uri": uri})
+                data = term_data.setdefault(term, {"uri": term})
                 
                 if field.endswith("_uris"): # List fields
                     data.setdefault(field, []).append(o)
@@ -155,25 +210,43 @@ class GraphLoader:
             OPTIONAL {{ ?val <https://schema.org/isPartOf> ?isPartOf }}
         }}
         """
-        for row in self.graph.query(query_enums):
-            row_any3: Any = row
-            uri = row_any3.val
-            if isinstance(uri, URIRef):
-                if "schema.org" not in str(uri) or uri in self.registry.all_terms():
+        enum_vals_data: Dict[URIRef, Dict[str, Any]] = {}
+        for val, enum, label, comment, is_part_of in self.graph.query(query_enums):
+            if isinstance(val, URIRef):
+                if "schema.org" not in str(val):
                     continue
-                    
-                try:
-                    val = SdoEnumerationvalue.model_validate({
-                        "uri": uri,
-                        "label": str(row_any3.label or str(uri).split("/")[-1]),
-                        "comment": str(row_any3.comment or ""),
-                        "isPartOf": row_any3.isPartOf,
-                        "enumeration_uri": row_any3.enum
-                    })
-                    self._enrich_metadata(val)
-                    self.registry.register(val)
-                except Exception as e:
-                    log.warning(f"Failed to load enum value {uri}: {e}")
+                data = enum_vals_data.setdefault(val, {
+                    "uri": val,
+                    "label": str(label or str(val).split("/")[-1]),
+                    "comment": str(comment or ""),
+                    "isPartOf": is_part_of,
+                    "enumeration_uris": []
+                })
+                if enum not in data["enumeration_uris"]:
+                    data["enumeration_uris"].append(enum)
+
+        for uri, data in enum_vals_data.items():
+            try:
+                super_uris = [o for o in self.graph.objects(uri, RDFS.subClassOf) if isinstance(o, URIRef)]
+                equivalent_uris = [o for o in self.graph.objects(uri, URIRef("http://www.w3.org/2002/07/owl#equivalentClass")) if isinstance(o, URIRef)]
+                superseded_by = next(self.graph.objects(uri, URI.supersededBy), None) or next(self.graph.objects(uri, URIRef("https://schema.org/supersededBy")), None)
+                
+                data.update({
+                    "super_uris": super_uris,
+                    "equivalent_uris": equivalent_uris,
+                    "superseded_by_uri": superseded_by
+                })
+                
+                val = SdoEnumerationvalue.model_validate(data)
+                self._enrich_metadata(val)
+                self.registry.register(val)
+            except Exception as e:
+                log.warning(f"Failed to load enum value {uri}: {e}")
+
+        # Clear termStack for Enumerations with no properties (matching old codebase bug)
+        for term in list(self.registry.all_terms().values()):
+            if isinstance(term, SdoEnumeration) and term.id != "Enumeration" and not term.properties:
+                term._stack_cleared = True
 
         return len(self.registry)
 

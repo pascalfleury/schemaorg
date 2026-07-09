@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 from typing import Annotated, List, Optional, Union, ClassVar, Any, Dict, Set
-from pydantic import Field, ConfigDict, computed_field, field_validator
+from pydantic import Field, ConfigDict, computed_field, field_validator, PrivateAttr
 from pydantic_rdf import BaseRdfModel, WithPredicate
 from rdflib import RDFS, RDF, URIRef
 import util.schema as schema
@@ -17,22 +17,13 @@ class TermList(list):
     @property
     def terms(self) -> List[Any]:
         return self
-class ExpandedBool(int):
-    """Boolean-like integer that also supports being called as a zero-argument function."""
-    def __new__(cls, val=1):
-        return super().__new__(cls, val)
-    def __call__(self) -> bool:
-        return True
-    def __str__(self) -> str:
-        return "True"
-    def __repr__(self) -> str:
-        return "True"
 
 class SdoTerm(BaseRdfModel):
     """Base model for all Schema.org terms."""
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
     
     rdf_type: ClassVar[URIRef] = RDFS.Resource
+    _stack_cleared: bool = PrivateAttr(default=False)
 
     label: Annotated[str, WithPredicate(RDFS.label)]
     comment: Annotated[Optional[str], WithPredicate(RDFS.comment)] = ""
@@ -75,8 +66,8 @@ class SdoTerm(BaseRdfModel):
         return self.id
 
     @property
-    def expanded(self) -> ExpandedBool:
-        return ExpandedBool(1)
+    def expanded(self) -> bool:
+        return True
 
     @property
     def examples(self) -> List[Any]:
@@ -127,11 +118,30 @@ class SdoTerm(BaseRdfModel):
     def equivalents(self) -> TermList:
         from .registry import TermRegistry
         registry = TermRegistry.get_instance()
-        eqs = [t for u in self.equivalent_uris if (t := registry.get(u)) and t.id != self.id]
+        eqs = []
+        
+        def get_or_create_ref(u: URIRef) -> SdoTerm:
+            t = registry.get(u)
+            if t:
+                return t
+            uri_str = str(u)
+            if ".org/" in uri_str:
+                label = uri_str.split(".org/")[-1]
+            else:
+                label = uri_str.split("/")[-1].split("#")[-1]
+            ref = SdoReference(uri=u, label=label)
+            registry.register(ref)
+            return ref
+
+        for u in self.equivalent_uris:
+            if u == self.uri:
+                continue
+            eqs.append(get_or_create_ref(u))
+            
         if isinstance(self, SdoProperty):
             for u in getattr(self, "equivalent_property_uris", []):
-                if (t := registry.get(u)):
-                    eqs.append(t)
+                eqs.append(get_or_create_ref(u))
+                
         return TermList(sorted(list(set(eqs)), key=lambda x: x.id))
 
     @equivalents.setter
@@ -175,19 +185,32 @@ class SdoTerm(BaseRdfModel):
     def subs(self) -> TermList:
         from .registry import TermRegistry
         registry = TermRegistry.get_instance()
-        res = [
-            t for t in registry.all_terms().values()
-            if isinstance(t, type(self)) and self.uri in getattr(t, "super_uris", [])
-        ]
+        
+        is_type = isinstance(self, SdoType)
+        is_prop = isinstance(self, SdoProperty)
+        
+        res = []
+        for t in registry.all_terms().values():
+            if is_type:
+                compatible = isinstance(t, SdoType) or isinstance(t, SdoEnumerationvalue)
+            elif is_prop:
+                compatible = isinstance(t, SdoProperty)
+            else:
+                compatible = False
+                
+            if compatible and self.uri in getattr(t, "super_uris", []):
+                res.append(t)
+                
         if isinstance(self, SdoDataType):
             for t in registry.all_terms().values():
-                if isinstance(t, SdoEnumerationvalue) and getattr(t, "enumeration_uri", None) == self.uri:
+                if isinstance(t, SdoEnumerationvalue) and any(u == self.uri for u in getattr(t, "enumeration_uris", [])):
                     res.append(t)
             if self.id == "DataType":
                 for t in registry.all_terms().values():
                     if isinstance(t, SdoDataType) and t.id != "DataType":
                         res.append(t)
-        return TermList(sorted(res, key=lambda x: x.id))
+                        
+        return TermList(sorted(list(set(res)), key=lambda x: x.id))
 
     @subs.setter
     def subs(self, value: List[Any]) -> None:
@@ -195,6 +218,19 @@ class SdoTerm(BaseRdfModel):
 
     @property
     def termStack(self) -> TermList:
+        if self._stack_cleared:
+            return TermList()
+        stack = []
+        for sup in self.supers:
+            if sup not in stack:
+                stack.append(sup)
+                for ancestor in getattr(sup, "termStack", []):
+                    if ancestor not in stack:
+                        stack.append(ancestor)
+        return TermList(stack)
+
+    @property
+    def _allproperties_stack(self) -> TermList:
         stack = []
         for sup in self.supers:
             if sup not in stack:
@@ -243,7 +279,7 @@ class SdoType(SdoTerm):
 
     @property
     def allproperties(self) -> TermList:
-        props = sorted(list(set(self.properties) | set([p for t in self.termStack for p in getattr(t, "properties", [])])), key=lambda x: x.id)
+        props = sorted(list(set(self.properties) | set([p for t in self._allproperties_stack for p in getattr(t, "properties", [])])), key=lambda x: x.id)
         return TermList(props)
 
     @property
@@ -344,13 +380,20 @@ class SdoEnumeration(SdoType):
         registry = TermRegistry.get_instance()
         res = [
             t for t in registry.all_terms().values() 
-            if isinstance(t, SdoEnumerationvalue) and getattr(t, "enumeration_uri", None) and str(getattr(t, "enumeration_uri", "")).split("/")[-1] == self.id
+            if isinstance(t, SdoEnumerationvalue) and any(str(u).split("/")[-1] == self.id for u in t.enumeration_uris)
         ]
         return TermList(sorted(res, key=lambda x: x.id))
 
 class SdoEnumerationvalue(SdoTerm):
     """Model for Schema.org Enumeration Values."""
-    enumeration_uri: Optional[URIRef] = None
+    enumeration_uris: List[URIRef] = Field(default_factory=list)
+    # Added for backward compatibility with previous codebase: dual-typed terms (e.g. DietNutrition) also have subClassOf (super_uris)
+    super_uris: Annotated[List[URIRef], WithPredicate(RDFS.subClassOf)] = Field(default_factory=list)
+
+    @property
+    def enumeration_uri(self) -> Optional[URIRef]:
+        return self.enumeration_uris[0] if self.enumeration_uris else None
+
     @property
     def enumerationParent(self) -> Optional["SdoEnumeration"]:
         if not self.enumeration_uri:

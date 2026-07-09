@@ -228,11 +228,17 @@ def fullReleasePage(page: str) -> str:
     all_enum_vals: Sequence[Any] = TermRegistry.get_instance().get_all_enumerationvalues()
     all_types: Sequence[Any] = TermRegistry.get_instance().get_all_types()
 
-    types: List[SdoTerm] = [t for t in list(all_enum_vals) + list(all_types) if isinstance(t, SdoTerm)]
+    types: List[SdoTerm] = [
+        t for t in list(all_enum_vals) + list(all_types)
+        if isinstance(t, SdoTerm) and "schema.org" in str(t.uri)
+    ]
     types = sorted(types, key=lambda t: t.id)
 
     all_props: Sequence[Any] = TermRegistry.get_instance().get_all_properties()
-    properties: List[SdoTerm] = [p for p in all_props if isinstance(p, SdoTerm)]
+    properties: List[SdoTerm] = [
+        p for p in all_props
+        if isinstance(p, SdoTerm) and "schema.org" in str(p.uri)
+    ]
 
     extra_vars: Dict[str, Any] = {
         "home_page": "False",

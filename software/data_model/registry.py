@@ -143,9 +143,6 @@ class TermRegistry:
             return reg._graph.query(q)
         return []
 
-    # Legacy aliases
-    getTerm = get_by_id
-    getAllTypes = get_all_types
 
     def __len__(self) -> int:
         return len(self._terms)

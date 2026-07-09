@@ -50,7 +50,7 @@ class BallparkCountTests(unittest.TestCase):
     def test_alltypes(self):
         # ballpark estimates.
         type_range = range(TYPECOUNT_LOWERBOUND, TYPECOUNT_UPPERBOUND)
-        self.assertIn(len(TermRegistry.get_instance().getAllTypes()), type_range)
+        self.assertIn(len(TermRegistry.get_instance().get_all_types()), type_range)
 
 
 class SDOBasicsTestCase(unittest.TestCase):
@@ -68,8 +68,8 @@ class SDOBasicsTestCase(unittest.TestCase):
 
 class SupertypePathsTestCase(unittest.TestCase):
     """
-    tRestaurant = VTerm.getTerm("Restaurant")
-    tThing = VTerm.getTerm("Thing")
+    tRestaurant = VTerm.get_by_id("Restaurant")
+    tThing = VTerm.get_by_id("Thing")
     for path in GetParentPathTo(tRestaurant, tThing ):
       pprint.pprint(', '.join([str(x.id) for x in path ]))"""
 
@@ -96,32 +96,32 @@ class SupertypePathsTestCase(unittest.TestCase):
 class SchemaBasicAPITestCase(unittest.TestCase):
     def test_gotThing(self):
         self.assertIsNotNone(
-            TermRegistry.get_instance().getTerm("Thing"),
+            TermRegistry.get_instance().get_by_id("Thing"),
             msg="Thing node should be accessible via GetUnit('Thing').",
         )
 
     def test_gotFooBarThing(self):
         self.assertIsNone(
-            TermRegistry.get_instance().getTerm("FooBar"),
+            TermRegistry.get_instance().get_by_id("FooBar"),
             msg="Thing node should NOT be accessible via GetUnit('FooBar').",
         )
 
     def test_NewsArticleIsType(self):
         # node.isClass
-        tNewsArticle = TermRegistry.get_instance().getTerm("NewsArticle")
+        tNewsArticle = TermRegistry.get_instance().get_by_id("NewsArticle")
         self.assertEqual(
             tNewsArticle.termType, SdoTermType.TYPE, "NewsArticle is a class."
         )
 
     def test_QuantityisDataType(self):
-        tQuantity = TermRegistry.get_instance().getTerm("Quantity")
+        tQuantity = TermRegistry.get_instance().get_by_id("Quantity")
         self.assertEqual(
             tQuantity.termType, SdoTermType.DATATYPE, "Quantity is a DataType."
         )
         # Quantity is a text-ish DataType.
 
     def test_ItemAvailabilityIsEnumeration(self):
-        eItemAvailability = TermRegistry.get_instance().getTerm("ItemAvailability")
+        eItemAvailability = TermRegistry.get_instance().get_by_id("ItemAvailability")
         self.assertEqual(
             eItemAvailability.termType,
             SdoTermType.ENUMERATION,
@@ -129,7 +129,7 @@ class SchemaBasicAPITestCase(unittest.TestCase):
         )
 
     def test_EnumerationIsEnumeration(self):
-        eEnumeration = TermRegistry.get_instance().getTerm("Enumeration")
+        eEnumeration = TermRegistry.get_instance().get_by_id("Enumeration")
         self.assertEqual(
             eEnumeration.termType,
             SdoTermType.ENUMERATION,
@@ -137,24 +137,24 @@ class SchemaBasicAPITestCase(unittest.TestCase):
         )
 
     def test_ArticleSupertypeNewsArticle(self):
-        tArticle = TermRegistry.get_instance().getTerm("Article")
+        tArticle = TermRegistry.get_instance().get_by_id("Article")
         self.assertTrue(
             "NewsArticle" in tArticle.subs.ids, "NewsArticle is a sub-type of Article"
         )
 
     def test_NewsArticleSupertypeArticle(self):
-        tNewsArticle = TermRegistry.get_instance().getTerm("NewsArticle")
-        # tArticle = sdoterm.SdoTermSource.getTerm("Article")
+        tNewsArticle = TermRegistry.get_instance().get_by_id("NewsArticle")
+        # tArticle = sdoterm.SdoTermSource.get_by_id("Article")
         self.assertNotIn(
             "Article", tNewsArticle.subs.ids, "Article is not a sub-type of NewsArticle"
         )
 
     def test_ThingSupertypeThing(self):
-        tThing = TermRegistry.get_instance().getTerm("Thing")
+        tThing = TermRegistry.get_instance().get_by_id("Thing")
         self.assertNotIn("Thing", tThing.subs.ids, "Thing subClassOf Thing.")
 
     def test_DataTypeSupertypeDataType(self):
-        tDataType = TermRegistry.get_instance().getTerm("DataType")
+        tDataType = TermRegistry.get_instance().get_by_id("DataType")
         self.assertNotIn(
             "DataType", tDataType.subs.ids, "DataType subClassOf DataType."
         )
@@ -163,11 +163,11 @@ class SchemaBasicAPITestCase(unittest.TestCase):
     # this is used.
 
     def test_PersonSupertypeThing(self):
-        tThing = TermRegistry.get_instance().getTerm("Thing")
+        tThing = TermRegistry.get_instance().get_by_id("Thing")
         self.assertIn("Person", tThing.subs.ids, "Person subClassOf Thing.")
 
     def test_ThingNotSupertypePerson(self):
-        tPerson = TermRegistry.get_instance().getTerm("Person")
+        tPerson = TermRegistry.get_instance().get_by_id("Person")
         self.assertNotIn("Thing", tPerson.subs.ids, "Thing not subClassOf Person.")
 
     def test_StoreSupertypeLocalBusiness(self):
@@ -189,14 +189,14 @@ class SchemaBasicAPITestCase(unittest.TestCase):
         )
 
     def test_PersonNotAttribute(self):
-        tPerson = TermRegistry.get_instance().getTerm("Person")
+        tPerson = TermRegistry.get_instance().get_by_id("Person")
         self.assertFalse(
             tPerson.termType == SdoTermType.PROPERTY,
             "Not true that Person isAttribute().",
         )
 
     def test_GetImmediateSubtypesOk(self):
-        tArticle = TermRegistry.get_instance().getTerm("Article")
+        tArticle = TermRegistry.get_instance().get_by_id("Article")
         self.assertIn(
             "NewsArticle",
             tArticle.subs.ids,
@@ -204,7 +204,7 @@ class SchemaBasicAPITestCase(unittest.TestCase):
         )
 
     def test_GetImmediateSubtypesWrong(self):
-        tArticle = TermRegistry.get_instance().getTerm("CreativeWork")
+        tArticle = TermRegistry.get_instance().get_by_id("CreativeWork")
         self.assertNotIn(
             "NewsArticle",
             tArticle.subs.ids,
@@ -214,11 +214,11 @@ class SchemaBasicAPITestCase(unittest.TestCase):
 
 class SchemaPropertyAPITestCase(unittest.TestCase):
     def test_actorSupersedesActors(self):
-        p_actor = TermRegistry.get_instance().getTerm("actor")
+        p_actor = TermRegistry.get_instance().get_by_id("actor")
         self.assertIn("actors", p_actor.supersedes, "actor supersedes actors.")
 
     def test_actorsSuperseded(self):
-        p_actors = TermRegistry.get_instance().getTerm("actors")
+        p_actors = TermRegistry.get_instance().get_by_id("actors")
         self.assertTrue(
             p_actors.superseded,
             "actors property has been superseded.%s %s"
@@ -226,17 +226,17 @@ class SchemaPropertyAPITestCase(unittest.TestCase):
         )
 
     def test_actorNotSuperseded(self):
-        p_actor = TermRegistry.get_instance().getTerm("actor")
+        p_actor = TermRegistry.get_instance().get_by_id("actor")
         self.assertFalse(p_actor.superseded, "actor property has not been superseded.")
 
     def test_offersNotSuperseded(self):
-        p_offers = TermRegistry.get_instance().getTerm("offers")
+        p_offers = TermRegistry.get_instance().get_by_id("offers")
         self.assertFalse(
             p_offers.superseded, "offers property has not been superseded."
         )
 
     def test_actorNotSupersededByOffers(self):
-        p_offers = TermRegistry.get_instance().getTerm("offers")
+        p_offers = TermRegistry.get_instance().get_by_id("offers")
         self.assertNotIn(
             "actor",
             p_offers.supersedes,
@@ -244,7 +244,7 @@ class SchemaPropertyAPITestCase(unittest.TestCase):
         )
 
     def test_offersNotSupersededByActor(self):
-        p_actor = TermRegistry.get_instance().getTerm("actor")
+        p_actor = TermRegistry.get_instance().get_by_id("actor")
         self.assertNotIn(
             "offers",
             p_actor.supersedes,
@@ -255,7 +255,7 @@ class SchemaPropertyAPITestCase(unittest.TestCase):
 # acceptedAnswer subPropertyOf suggestedAnswer .
 class SchemaPropertyMetadataTestCase(unittest.TestCase):
     def test_suggestedAnswerSuperproperties(self):
-        p_acceptedAnswer = TermRegistry.get_instance().getTerm("acceptedAnswer")
+        p_acceptedAnswer = TermRegistry.get_instance().get_by_id("acceptedAnswer")
         self.assertIn(
             "suggestedAnswer",
             p_acceptedAnswer.supers.ids[0],
@@ -263,7 +263,7 @@ class SchemaPropertyMetadataTestCase(unittest.TestCase):
         )
 
     def test_acceptedAnswerSuperpropertiesArrayLen(self):
-        p_acceptedAnswer = TermRegistry.get_instance().getTerm("acceptedAnswer")
+        p_acceptedAnswer = TermRegistry.get_instance().get_by_id("acceptedAnswer")
         aa_supers = p_acceptedAnswer.supers
         self.assertEqual(
             len(aa_supers),
@@ -273,7 +273,7 @@ class SchemaPropertyMetadataTestCase(unittest.TestCase):
         )
 
     def test_answerSubproperty(self):
-        p_suggestedAnswer = TermRegistry.get_instance().getTerm("suggestedAnswer")
+        p_suggestedAnswer = TermRegistry.get_instance().get_by_id("suggestedAnswer")
         self.assertIn(
             "acceptedAnswer",
             p_suggestedAnswer.subs.ids,
@@ -281,7 +281,7 @@ class SchemaPropertyMetadataTestCase(unittest.TestCase):
         )
 
     def test_answerSubproperties(self):
-        p_suggestedAnswer = TermRegistry.get_instance().getTerm("suggestedAnswer")
+        p_suggestedAnswer = TermRegistry.get_instance().get_by_id("suggestedAnswer")
         self.assertEqual(
             "acceptedAnswer",
             p_suggestedAnswer.subs.ids[0],
@@ -289,14 +289,14 @@ class SchemaPropertyMetadataTestCase(unittest.TestCase):
         )
 
     def test_offerSubpropertiesArrayLen(self):
-        p_offers = TermRegistry.get_instance().getTerm("offers")
+        p_offers = TermRegistry.get_instance().get_by_id("offers")
         self.assertEqual(
             len(p_offers.subs), 0, "offers subproperties() gives array of len 0."
         )
 
     def test_alumniSuperproperty(self):
-        p_alumni = TermRegistry.get_instance().getTerm("alumni")
-        p_suggestedAnswer = TermRegistry.get_instance().getTerm("suggestedAnswer")
+        p_alumni = TermRegistry.get_instance().get_by_id("alumni")
+        p_suggestedAnswer = TermRegistry.get_instance().get_by_id("suggestedAnswer")
         self.assertNotIn(
             "alumni",
             p_suggestedAnswer.supers.ids,
@@ -320,9 +320,9 @@ class SchemaPropertyMetadataTestCase(unittest.TestCase):
         )
 
     def test_alumniInverse(self):
-        p_alumni = TermRegistry.get_instance().getTerm("alumni")
-        p_alumniOf = TermRegistry.get_instance().getTerm("alumniOf")
-        p_suggestedAnswer = TermRegistry.get_instance().getTerm("suggestedAnswer")
+        p_alumni = TermRegistry.get_instance().get_by_id("alumni")
+        p_alumniOf = TermRegistry.get_instance().get_by_id("alumniOf")
+        p_suggestedAnswer = TermRegistry.get_instance().get_by_id("suggestedAnswer")
 
         # log.info("alumni: " + str(p_alumniOf.getInverseOf() ))
 
@@ -361,7 +361,7 @@ class SchemaPropertyMetadataTestCase(unittest.TestCase):
 
 class EnumerationValueTests(unittest.TestCase):
     def test_EventStatusTypeIsEnumeration(self):
-        eEventStatusType = TermRegistry.get_instance().getTerm("EventStatusType")
+        eEventStatusType = TermRegistry.get_instance().get_by_id("EventStatusType")
         self.assertEqual(
             eEventStatusType.termType,
             SdoTermType.ENUMERATION,
@@ -369,7 +369,7 @@ class EnumerationValueTests(unittest.TestCase):
         )
 
     def test_EventStatusTypeIsntEnumerationValue(self):
-        eEventStatusType = TermRegistry.get_instance().getTerm("EventStatusType")
+        eEventStatusType = TermRegistry.get_instance().get_by_id("EventStatusType")
         self.assertNotEqual(
             eEventStatusType.termType,
             SdoTermType.ENUMERATIONVALUE,
@@ -377,7 +377,7 @@ class EnumerationValueTests(unittest.TestCase):
         )
 
     def test_EventCancelledIsEnumerationValue(self):
-        eEventCancelled = TermRegistry.get_instance().getTerm("EventCancelled")
+        eEventCancelled = TermRegistry.get_instance().get_by_id("EventCancelled")
         self.assertEqual(
             eEventCancelled.termType,
             SdoTermType.ENUMERATIONVALUE,
@@ -388,19 +388,19 @@ class EnumerationValueTests(unittest.TestCase):
 class DataTypeTests(unittest.TestCase):
     def test_booleanDataType(self):
         self.assertEqual(
-            TermRegistry.get_instance().getTerm("Boolean").termType,
+            TermRegistry.get_instance().get_by_id("Boolean").termType,
             SdoTermType.DATATYPE,
         )
         self.assertEqual(
-            TermRegistry.get_instance().getTerm("DataType").termType,
+            TermRegistry.get_instance().get_by_id("DataType").termType,
             SdoTermType.DATATYPE,
         )
         self.assertNotEqual(
-            TermRegistry.get_instance().getTerm("Thing").termType,
+            TermRegistry.get_instance().get_by_id("Thing").termType,
             SdoTermType.DATATYPE,
         )
         self.assertNotEqual(
-            TermRegistry.get_instance().getTerm("Duration").termType,
+            TermRegistry.get_instance().get_by_id("Duration").termType,
             SdoTermType.DATATYPE,
         )
 
@@ -418,19 +418,19 @@ class MarkDownTest(unittest.TestCase):
 
 class HasMultipleBaseTypesTests(unittest.TestCase):
     def test_localbusiness2supertypes(self):
-        fred = TermRegistry.get_instance().getTerm("LocalBusiness")
+        fred = TermRegistry.get_instance().get_by_id("LocalBusiness")
         self.assertGreater(
             len(fred.supers), 1, msg="LocalBusiness is subClassOf Place + Organization."
         )
 
     def test_restaurant_non_multiple_supertypes(self):
-        fred = TermRegistry.get_instance().getTerm("Restaurant")
+        fred = TermRegistry.get_instance().get_by_id("Restaurant")
         self.assertEqual(
             len(fred.supers), 1, msg="Restaurant only has one *direct* supertype."
         )
 
     def test_article_non_multiple_supertypes(self):
-        fred = TermRegistry.get_instance().getTerm("Article")
+        fred = TermRegistry.get_instance().get_by_id("Article")
         self.assertEqual(
             len(fred.supers), 1, msg="Article only has one direct supertype."
         )

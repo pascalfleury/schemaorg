@@ -51,7 +51,7 @@ def showTerm(term, ind=""):
     print("%ssupersedes: %s" % (ind, term.supersedes))
 
     if term.termType == SdoTermType.TYPE or term.termType == SdoTermType.ENUMERATION or term.termType == SdoTermType.DATATYPE:
-        if term.expanded():
+        if term.expanded:
             print("%sProperties count %s" % (ind, len(term.properties)))
             for p in term.properties.terms:
                 showTerm(p, ind=ind + "   ")
@@ -73,7 +73,7 @@ def showTerm(term, ind=""):
     if term.termType == SdoTermType.ENUMERATIONVALUE:
         print("%sParent Enumeration: %s" % (ind, term.enumerationParent))
 
-    if term.expanded():
+    if term.expanded:
         print("%stermStack count: %s " % (ind, len(term.termStack)))
         for t in term.termStack.terms:
             showTerm(t, ind=ind + "...")

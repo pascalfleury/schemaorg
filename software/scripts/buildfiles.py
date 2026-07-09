@@ -173,6 +173,9 @@ def exportrdf(exportType: str, subdirectory_path: Optional[str] = None) -> None:
 
         if isinstance(registry._graph, rdflib.Graph):
             ALL_GRAPH += registry._graph
+            for prefix, uri in registry._graph.namespaces():
+                ALL_GRAPH.bind(prefix, uri)
+                CURRENT_GRAPH.bind(prefix, uri)
         protocol: str
         protocol, _ = protocols()
 
@@ -252,8 +255,14 @@ def _exportrdf(output_format: str, all_graph: rdflib.Graph, current_graph: rdfli
     for selector in fileutils.FILESET_SELECTORS:
         g: rdflib.Graph = all_graph if fileutils.isAll(selector) else current_graph
         ns_mgr: rdflib.namespace.NamespaceManager = g.namespace_manager
+        
+        clean_ns_mgr = rdflib.namespace.NamespaceManager(rdflib.Graph())
+        for prefix, uri in ns_mgr.namespaces():
+            if not (prefix.startswith("ns") and prefix[2:].isdigit()):
+                clean_ns_mgr.bind(prefix, uri, override=True)
+                
         g_can: rdflib.Graph = to_canonical_graph(g)
-        g_can.namespace_manager = ns_mgr
+        g_can.namespace_manager = clean_ns_mgr
 
         if output_format == "rdf":
             g_out = rdflib.Graph()
@@ -316,6 +325,8 @@ def uriwrap(thing: Any) -> str:
     """Convert various types into uris. Sorts items if they are a list."""
     if not thing:
         return ""
+    if isinstance(thing, rdflib.URIRef):
+        return str(thing)
     if isinstance(thing, str):
         return thing if thing.startswith(("http:", "https:")) else f"{VOCABURI}{thing}"
     if isinstance(thing, SdoTerm):
@@ -373,6 +384,11 @@ def exportcsv(page: str) -> None:
                 row["properties"] = uriwrap(getattr(term_any, "allproperties", []))
             typedata_all.append(row)
             if not term_any.retired: typedata.append(row)
+
+    propdata = sorted(propdata, key=lambda x: x["id"])
+    propdata_all = sorted(propdata_all, key=lambda x: x["id"])
+    typedata = sorted(typedata, key=lambda x: x["id"])
+    typedata_all = sorted(typedata_all, key=lambda x: x["id"])
 
     writecsvout("properties", propdata, prop_fields, fileutils.FileSelector.CURRENT, protocol, altprotocol)
     writecsvout("properties", propdata_all, prop_fields, fileutils.FileSelector.ALL, protocol, altprotocol)
