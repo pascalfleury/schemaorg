@@ -231,10 +231,18 @@ class GraphLoader:
                 equivalent_uris = [o for o in self.graph.objects(uri, URIRef("http://www.w3.org/2002/07/owl#equivalentClass")) if isinstance(o, URIRef)]
                 superseded_by = next(self.graph.objects(uri, URI.supersededBy), None) or next(self.graph.objects(uri, URIRef("https://schema.org/supersededBy")), None)
                 
+                source_uris = list(self.graph.objects(uri, URIRef("http://schema.org/source"))) + list(self.graph.objects(uri, URIRef("https://schema.org/source")))
+                source_uris = list(set([o for o in source_uris if isinstance(o, URIRef)]))
+                
+                contributor_uris = list(self.graph.objects(uri, URIRef("http://schema.org/contributor"))) + list(self.graph.objects(uri, URIRef("https://schema.org/contributor")))
+                contributor_uris = list(set([o for o in contributor_uris if isinstance(o, URIRef)]))
+
                 data.update({
                     "super_uris": super_uris,
                     "equivalent_uris": equivalent_uris,
-                    "superseded_by_uri": superseded_by
+                    "superseded_by_uri": superseded_by,
+                    "source_uris": source_uris,
+                    "contributor_uris": contributor_uris
                 })
                 
                 val = SdoEnumerationvalue.model_validate(data)

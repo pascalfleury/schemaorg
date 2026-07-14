@@ -29,8 +29,6 @@ import util.textutils as textutils
 
 log: logging.Logger = logging.getLogger(__name__)
 
-STRCLASSVAL: Optional[str] = None
-
 
 def docsTemplateRender(template: str, extra_vars: Optional[Dict[str, Any]] = None) -> str:
     tvars: Dict[str, Any] = {"BUILDOPTS": schema.config.BUILDOPTS, "docsdir": schema.constants.DOCSDOCSDIR}
@@ -48,25 +46,23 @@ def schemasPage(page: str) -> str:
     return docsTemplateRender("docs/Schemas.j2", extra_vars)
 
 
-PAGE_CONFIGS: Dict[str, Tuple[str, str, str, str]] = {
-    "PendingHome": ("Pending", "docs/PendingHome.j2", "pending", 'class="ext ext-pending"'),
-    "AtticHome": ("Retired", "docs/AtticHome.j2", "attic", 'class="ext ext-attic"'),
-    "AutoHome": ("Autotomotives", "docs/AutoHome.j2", "auto", 'class="ext"'),
-    "BibHome": ("Bib", "docs/BibHome.j2", "bib", 'class="ext"'),
-    "Health-lifesciHome": ("Health-lifesci", "docs/Health-lifesciHome.j2", "health-lifesci", 'class="ext"'),
-    "MetaHome": ("Meta", "docs/MetaHome.j2", "meta", 'class="ext"'),
+PAGE_CONFIGS: Dict[str, Tuple[str, str, str]] = {
+    "PendingHome": ("Pending", "docs/PendingHome.j2", "pending"),
+    "AtticHome": ("Retired", "docs/AtticHome.j2", "attic"),
+    "AutoHome": ("Autotomotives", "docs/AutoHome.j2", "auto"),
+    "BibHome": ("Bib", "docs/BibHome.j2", "bib"),
+    "Health-lifesciHome": ("Health-lifesci", "docs/Health-lifesciHome.j2", "health-lifesci"),
+    "MetaHome": ("Meta", "docs/MetaHome.j2", "meta"),
 }
 
 def homePage(page: str) -> str:
-    global STRCLASSVAL
     title: str = schema.constants.SITENAME
     template: str = "docs/Home.j2"
     filt: Optional[str] = None
-    overrideclassval: Optional[str] = None
 
-    config: Optional[Tuple[str, str, str, str]] = PAGE_CONFIGS.get(page)
+    config: Optional[Tuple[str, str, str]] = PAGE_CONFIGS.get(page)
     if config:
-        title, template, filt, overrideclassval = config
+        title, template, filt = config
 
     sectionterms: Dict[str, Dict[SdoTermType, List[SdoTerm]]] = {}
     termcount: int = 0
@@ -93,10 +89,7 @@ def homePage(page: str) -> str:
         "termcount": termcount,
         "sectionterms": sectionterms,
     }
-    STRCLASSVAL = overrideclassval
-    ret: str = docsTemplateRender(template, extra_vars)
-    STRCLASSVAL = None
-    return ret
+    return docsTemplateRender(template, extra_vars)
 
 
 def buildTermCatList(terms: Iterable[SdoTerm], checkCat: bool = False) -> Tuple[Dict[str, Dict[SdoTermType, List[SdoTerm]]], int]:

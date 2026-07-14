@@ -166,10 +166,8 @@ class SdoTerm(BaseRdfModel):
         from .registry import TermRegistry
         registry = TermRegistry.get_instance()
         res = []
-        print(f"DEBUG: supers called for {self.id}, super_uris: {getattr(self, 'super_uris', None)}")
         for u in getattr(self, "super_uris", []):
             t = registry.get(u)
-            print(f"  u: {u}, registry.get(u): {t}")
             if not t and "schema.org" in str(u):
                 stem = str(u).split("/")[-1].split("#")[-1]
                 t = self.__class__(id=stem, uri=str(u), label=stem)
@@ -241,19 +239,19 @@ class SdoTerm(BaseRdfModel):
         return TermList(stack)
 
     @property
-    def superPaths(self) -> List[List[Any]]:
+    def superPaths(self) -> List[TermList]:
         if self.id == "Thing":
-            return [[self]]
+            return [TermList([self])]
         if isinstance(self, SdoEnumerationvalue):
             parent = getattr(self, "enumerationParent", None)
-            paths = getattr(parent, "superPaths", [[]])
-            return [TermList() for p in paths if p and getattr(p[0], "id", "") == "Enumeration"] or [TermList()]
+            paths = getattr(parent, "superPaths", [])
+            return [TermList(p + [self]) for p in paths] or [TermList([self])]
         if not self.supers:
-            return [[self]]
+            return [TermList([self])]
         paths = []
         for parent in self.supers:
             for path in getattr(parent, "superPaths", []):
-                paths.append(path + [self])
+                paths.append(TermList(path + [self]))
         return paths
 
     def __hash__(self):

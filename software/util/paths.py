@@ -130,8 +130,13 @@ class OutputLayout:
 
 
 def DefaultInputLayout() -> InputLayout:
-    """Returns the default InputLayout instance relative to the current working directory."""
-    # Find project root by looking for 'data' directory starting from CWD and going up
+    """Returns the default InputLayout instance relative to the project root."""
+    # Try finding root relative to this file (software/util/paths.py -> root)
+    root = Path(__file__).resolve().parent.parent.parent
+    if (root / "data").exists() and (root / "software").exists():
+        return InputLayout(root)
+
+    # Fallback to CWD lookup
     root = Path.cwd()
     for _ in range(5):
         if (root / "data").exists() and (root / "software").exists():

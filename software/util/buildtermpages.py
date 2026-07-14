@@ -14,6 +14,8 @@ import unicodedata
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Type
 
 import jinja2
+import json
+from util.sort_dict import sort_dict
 
 import software
 
@@ -47,6 +49,80 @@ def termFileName(termid: str) -> str:
         raise ValueError(f"Invalid term_id: '{termid}'")
 
     return str(paths.DefaultOutputLayout().domain_file(paths.Domain.TERMS, f"{sub_dir}/{c}/{termid}.html"))
+
+
+def _get_term_as_rdf_string(term: SdoTerm, output_format: str, full: bool = False) -> str:
+    registry = TermRegistry.get_instance()
+    g_source = getattr(registry, "_graph", None)
+    if not g_source or not term or getattr(term, "termType", None) == SdoTermType.REFERENCE:
+        return ""
+
+    from rdflib import Graph, URIRef
+    g = Graph()
+    g.bind("schema", schema.URI)
+    from software.data_model.loader import NAMESPACES
+    for prefix, uri in NAMESPACES.items():
+        g.bind(prefix, URIRef(uri))
+
+    def triples_for_term(t):
+        return g_source.triples((t.uri, None, None))
+
+    if not full:
+        for trip in triples_for_term(term):
+            g.add(trip)
+    else:
+        terms_to_add = [term]
+        terms_to_add.extend(term.termStack)
+        additional_terms = []
+        for t in terms_to_add:
+            if getattr(t, "termType", None) == SdoTermType.PROPERTY:
+                pass
+            else:
+                if getattr(t, "termType", None) == SdoTermType.ENUMERATIONVALUE:
+                    parent = getattr(t, "enumerationParent", None)
+                    if parent:
+                        additional_terms.append(parent)
+                elif t == term:
+                    additional_terms.extend(t.allproperties)
+        terms_to_add.extend(additional_terms)
+
+        seen = set()
+        dedup_terms = []
+        for t in terms_to_add:
+            if t.uri not in seen:
+                seen.add(t.uri)
+                dedup_terms.append(t)
+
+        types = []
+        props = []
+        for t in dedup_terms:
+            if getattr(t, "termType", None) == SdoTermType.PROPERTY:
+                props.append(t)
+            else:
+                types.append(t)
+
+        for t in sorted(types, key=lambda x: x.id):
+            for trip in triples_for_term(t):
+                g.add(trip)
+        for p in sorted(props, key=lambda x: x.id):
+            for trip in triples_for_term(p):
+                g.add(trip)
+
+    if output_format == "rdf":
+        output_format = "pretty-xml"
+
+    ret = g.serialize(format=output_format, auto_compact=True, sort_keys=True, max_depth=1)
+    if isinstance(ret, bytes):
+        ret = ret.decode("utf-8")
+
+    if output_format == "json-ld":
+        try:
+            data = json.loads(ret)
+            return json.dumps(sort_dict(data), indent=2)
+        except Exception:
+            pass
+
+    return ret
 
 
 class TermPageRenderer:
@@ -125,7 +201,7 @@ class TermPageRenderer:
                 return 0.0
             try:
                 examples: List[schemaexamples.Example] = schemaexamples.SchemaExamples.examplesForTerm(term.id)
-                json_str: str = ""
+                json_str: str = _get_term_as_rdf_string(term, "json-ld", full=True)
                 pageout: str = self.termtemplateRender(term, examples, json_str)
                 outfile: Path = Path(termFileName(term.id))
                 fileutils.checkFilePath(outfile.parent)

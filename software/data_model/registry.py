@@ -26,14 +26,33 @@ class TermRegistry:
         """Clears the global registry instance. Useful for testing."""
         cls._instance = None
 
+    def _index_id(self, term_id: str, uri: URIRef):
+        existing_uri = self._id_index.get(term_id)
+        if not existing_uri:
+            self._id_index[term_id] = uri
+            return
+
+        new_is_schema = "schema.org" in str(uri)
+        old_is_schema = "schema.org" in str(existing_uri)
+        
+        if new_is_schema and not old_is_schema:
+            self._id_index[term_id] = uri
+            return
+
+        if new_is_schema and old_is_schema:
+            import util.schema as schema
+            vocab_uri = getattr(schema, "VOCABURI", "https://schema.org/")
+            if str(uri).startswith(vocab_uri) and not str(existing_uri).startswith(vocab_uri):
+                self._id_index[term_id] = uri
+
     def register(self, term: Any):
         """Adds a term to the registry and indexes its short ID."""
         self._terms[term.uri] = term
         if hasattr(term, "id") and term.id:
-            self._id_index[term.id] = term.uri
+            self._index_id(term.id, term.uri)
             # Also index prefixed version if available
             if ":" not in term.id:
-                self._id_index[f"schema:{term.id}"] = term.uri
+                self._index_id(f"schema:{term.id}", term.uri)
 
     def get(self, uri: URIRef) -> Optional[Any]:
         """Retrieves a term by its full URI."""
