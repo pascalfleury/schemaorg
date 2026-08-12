@@ -24,8 +24,8 @@ JSON:
     "@type": "Country",
     "name": "United States"
   },
-  "validFrom": "2023-01-01", 
-  "validThrough": "2032-12-31", 
+  "validFrom": "2023-01-01",
+  "validThrough": "2032-12-31",
   "incentiveType": "IncentiveTypeTaxCredit",
   "purchaseType": "PurchaseTypeNewPurchase",
   "incentiveAmount": {
@@ -40,7 +40,7 @@ JSON:
     "inDefinedTermSet": "https://www.unspsc.org/",
     "termCode": "25101509",
     "name": "Electrically powered vehicle"
-  }, 
+  },
   "incomeLimit": {
     "@type": "MonetaryAmount",
     "maxValue": "114000",
@@ -62,10 +62,10 @@ JSON:
   "@context": "https://schema.org/",
   "@type": "FinancialIncentive",
   "name": "ACT Sustainable Household Scheme",
-  "url": "https://www.climatechoices.act.gov.au/policy-programs/sustainable-household-scheme", 
+  "url": "https://www.climatechoices.act.gov.au/policy-programs/sustainable-household-scheme",
   "publisher": {
     "@type": "Organization",
-    "name": "ACT Government" 
+    "name": "ACT Government"
   },
   "provider": {
     "@type": "Organization",
@@ -75,16 +75,16 @@ JSON:
     "@type": "State",
     "name": "Australian Capital Territory"
   },
-  "validFrom": "2021-05-01", 
-  "validThrough": "2026-06-30", 
-  "incentiveType": "IncentiveTypeLoan", 
+  "validFrom": "2021-05-01",
+  "validThrough": "2026-06-30",
+  "incentiveType": "IncentiveTypeLoan",
   "purchaseType": "PurchaseTypeNewPurchase",
   "incentiveAmount": {
     "@type": "LoanOrCredit",
     "loanTerm": {
       "@type": "QuantitativeValue",
       "value": "10",
-      "unitCode": "ANN" 
+      "unitCode": "ANN"
     },
     "annualPercentageRate": [
       {
@@ -147,24 +147,24 @@ JSON:
   "@context": "https://schema.org/",
   "@type": "FinancialIncentive",
   "name": "Electric Vehicle Chargepoint Grant",
-  "url": "https://www.gov.uk/electric-vehicle-chargepoint-grant-household", 
+  "url": "https://www.gov.uk/electric-vehicle-chargepoint-grant-household",
   "publisher": {
     "@type": "Organization",
-    "name": "UK Government" 
+    "name": "UK Government"
   },
   "provider": {
     "@type": "Organization",
-    "name": "Office for Zero Emission Vehicles (OZEV)" 
+    "name": "Office for Zero Emission Vehicles (OZEV)"
   },
   "areaServed": {
     "@type": "Country",
     "name": "United Kingdom"
   },
-  "validFrom": "2020-04-01", 
-  "validThrough": "2025-03-31", 
+  "validFrom": "2020-04-01",
+  "validThrough": "2025-03-31",
   "incentiveType": "IncentiveTypeRebateOrSubsidy",
   "purchaseType": "PurchaseTypeNewPurchase",
-  "incentiveStatus": "IncentiveStatusActive", 
+  "incentiveStatus": "IncentiveStatusActive",
   "incentivizedItem": {
     "@type": "DefinedTerm",
     "inDefinedTermSet": "https://www.unspsc.org/",
@@ -210,8 +210,8 @@ JSON:
     "@type": "City",
     "name": "Banff"
   },
-  "validFrom": "2018-01-01", 
-  "validThrough": "2024-12-31", 
+  "validFrom": "2018-01-01",
+  "validThrough": "2024-12-31",
   "incentiveType": "IncentiveTypeRebateOrSubsidy",
   "purchaseType": "PurchaseTypeNewPurchase",
   "incentiveAmount": {
@@ -219,11 +219,11 @@ JSON:
     "price": "750",
     "priceCurrency": "USD",
     "referenceQuantity": "1",
-    "unitCode": "KWT", 
+    "unitCode": "KWT",
     "unitText": "kW",
-    "maxPrice": "15000" 
+    "maxPrice": "15000"
   },
-  "incentiveStatus": "IncentiveStatusActive", 
+  "incentiveStatus": "IncentiveStatusActive",
   "incentivizedItem": {
     "@type": "DefinedTerm",
     "inDefinedTermSet": "https://www.unspsc.org/",
