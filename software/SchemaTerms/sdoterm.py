@@ -14,6 +14,8 @@ from typing import Any, Dict, FrozenSet, Iterable, List, Optional, Sequence, Set
 
 import software
 
+import SchemaTerms.sdotermsource as sdotermsource
+
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -44,8 +46,7 @@ class SdoTermOrId:
 
     def _resolve(self) -> Optional["SdoTerm"]:
         if not self._term and self._term_id:
-            from SchemaTerms.sdotermsource import SdoTermSource
-            self._term = SdoTermSource.getTerm(self._term_id)
+            self._term = sdotermsource.SdoTermSource.getTerm(self._term_id)
         return self._term
 
     @property

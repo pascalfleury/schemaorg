@@ -18,7 +18,6 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Un
 import software
 
 import SchemaTerms.localmarkdown as localmarkdown
-from software.data_model.models import SdoTerm
 from software.data_model.registry import TermRegistry
 from rdflib import URIRef
 from pathlib import Path

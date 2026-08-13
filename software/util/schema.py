@@ -14,6 +14,8 @@ import software
 
 import util.paths as paths
 from util.sort_dict import sort_dict
+from software.data_model.registry import TermRegistry
+from software.data_model.namespaces import NAMESPACES
 
 VOCABURI: str = "https://schema.org/"
 URI: rdflib.Namespace = rdflib.Namespace(VOCABURI)
@@ -112,18 +114,26 @@ class ProtoAndRoot(NamedTuple):
     protocol: Optional[str]
     root: Optional[str]
 
+def _get_registry():
+    return TermRegistry.get_instance()
+
 def toFullId(term_id: str) -> str:
     """Converts a short ID or prefixed ID to a full URI."""
     if term_id.startswith(("http:", "https:")):
         return term_id
     if ":" in term_id:
         prefix, name = term_id.split(":", 1)
-        from software.data_model.registry import TermRegistry
-        graph = getattr(TermRegistry.get_instance(), "_graph", None)
+        reg = _get_registry()
+        graph = getattr(reg, "_graph", None)
         if graph:
             for pref, pth in graph.namespaces():
-                if str(pref) == prefix:
+                p = str(pref)
+                if p.startswith("ns") and p[2:].isdigit():
+                    continue
+                if p == prefix:
                     return f"{pth}{name}"
+        if prefix in NAMESPACES:
+            return f"{NAMESPACES[prefix]}{name}"
         return term_id
     return f"{VOCABURI}{term_id}"
 
@@ -137,14 +147,29 @@ def uri2id(uri: str) -> str:
 
 def prefixedIdFromUri(uri: str) -> str:
     """Converts a URI to prefix:id format."""
-    from software.data_model.registry import TermRegistry
-    graph = getattr(TermRegistry.get_instance(), "_graph", None)
+    reg = _get_registry()
+    graph = getattr(reg, "_graph", None)
     if graph:
         for pref, pth in graph.namespaces():
+            p = str(pref)
+            if p.startswith("ns") and p[2:].isdigit():
+                continue
             if str(uri).startswith(str(pth)):
-                p = str(pref) or "schema"
+                p = p or "schema"
                 return f"{p}:{str(uri)[len(str(pth)):]}"
+    for pref, pth in NAMESPACES.items():
+        if str(uri).startswith(str(pth)):
+            return f"{pref}:{str(uri)[len(str(pth)):]}"
     return str(uri)
+
+def isSchemaUri(uri: Any) -> bool:
+    """Returns True if the URI or term belongs to Schema.org (core or extension)."""
+    if not uri:
+        return False
+    uri_str = str(getattr(uri, "uri", uri))
+    return "schema.org" in uri_str
+
+is_schema_uri = isSchemaUri
 
 def layerFromUri(uri: Optional[str]) -> Optional[str]:
     """Determines the layer from a URI."""
@@ -170,8 +195,8 @@ def uriFromLayer(layer: Optional[str] = None) -> str:
 
 def prefixFromUri(uri: str) -> Optional[str]:
     if not uri: return None
-    from software.data_model.registry import TermRegistry
-    graph = getattr(TermRegistry.get_instance(), "_graph", None)
+    reg = _get_registry()
+    graph = getattr(reg, "_graph", None)
     if graph:
         for pref, pth in graph.namespaces():
             if str(uri).startswith(str(pth)):
@@ -180,8 +205,8 @@ def prefixFromUri(uri: str) -> Optional[str]:
 
 def uriForPrefix(prefix: str) -> Optional[rdflib.URIRef]:
     if not prefix: return None
-    from software.data_model.registry import TermRegistry
-    graph = getattr(TermRegistry.get_instance(), "_graph", None)
+    reg = _get_registry()
+    graph = getattr(reg, "_graph", None)
     if graph:
         for pref, pth in graph.namespaces():
             if str(pref) == prefix:

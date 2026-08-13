@@ -13,10 +13,12 @@ import software
 
 import SchemaExamples.schemaexamples as schemaexamples
 import SchemaTerms.localmarkdown as localmarkdown
+from software.data_model.loader import GraphLoader
 from software.data_model.models import SdoTerm
 from software.data_model.registry import TermRegistry
 from software.data_model.type_map import SdoTermType
 import util.paths as paths
+from software.util.paths import DefaultInputLayout
 import util.schema as schema
 
 
@@ -34,8 +36,6 @@ CURRENT_CONTEXT_FILE = str(paths.DefaultOutputLayout().domain_file(paths.Domain.
 
 log = logging.getLogger(__name__)
 
-from software.util.paths import DefaultInputLayout
-from software.data_model.loader import GraphLoader
 layout = DefaultInputLayout()
 loader = GraphLoader.from_layout(layout)
 loader.load_all()
@@ -51,6 +51,21 @@ class BallparkCountTests(unittest.TestCase):
         # ballpark estimates.
         type_range = range(TYPECOUNT_LOWERBOUND, TYPECOUNT_UPPERBOUND)
         self.assertIn(len(TermRegistry.get_instance().get_all_types()), type_range)
+
+
+class TestIsSchemaUri(unittest.TestCase):
+    def test_is_schema_uri(self):
+        self.assertTrue(schema.isSchemaUri("https://schema.org/Person"))
+        self.assertTrue(schema.isSchemaUri("http://schema.org/Thing"))
+        self.assertTrue(schema.isSchemaUri("https://pending.schema.org/eventAttendanceMode"))
+        self.assertFalse(schema.isSchemaUri("http://purl.org/dc/terms/title"))
+        self.assertFalse(schema.isSchemaUri("http://xmlns.com/foaf/0.1/name"))
+        self.assertFalse(schema.isSchemaUri(None))
+        self.assertFalse(schema.isSchemaUri(""))
+        thing = TermRegistry.get_instance().get("Thing")
+        if thing:
+            self.assertTrue(schema.isSchemaUri(thing))
+
 
 
 class SDOBasicsTestCase(unittest.TestCase):

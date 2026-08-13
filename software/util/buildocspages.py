@@ -220,17 +220,19 @@ def fullReleasePage(page: str) -> str:
 
     all_enum_vals: Sequence[Any] = TermRegistry.get_instance().get_all_enumerationvalues()
     all_types: Sequence[Any] = TermRegistry.get_instance().get_all_types()
+    all_enums: Sequence[Any] = TermRegistry.get_instance().get_all_enumerations()
+    all_dts: Sequence[Any] = [d for d in TermRegistry.get_instance().get_all_datatypes() if d.id not in ("True", "False")]
 
     types: List[SdoTerm] = [
-        t for t in list(all_enum_vals) + list(all_types)
-        if isinstance(t, SdoTerm) and "schema.org" in str(t.uri)
+        t for t in list(all_enum_vals) + list(all_types) + list(all_enums) + list(all_dts)
+        if isinstance(t, SdoTerm) and schema.isSchemaUri(t.uri)
     ]
     types = sorted(types, key=lambda t: t.id)
 
     all_props: Sequence[Any] = TermRegistry.get_instance().get_all_properties()
     properties: List[SdoTerm] = [
         p for p in all_props
-        if isinstance(p, SdoTerm) and "schema.org" in str(p.uri)
+        if isinstance(p, SdoTerm) and schema.isSchemaUri(p.uri)
     ]
 
     extra_vars: Dict[str, Any] = {

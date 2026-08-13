@@ -62,15 +62,8 @@ def createcontext() -> str:
                 continue
             if getattr(term, "termType", None) == SdoTermType.REFERENCE:
                 continue
-            if not "schema.org" in str(term.uri):
+            if not schema.isSchemaUri(term.uri):
                 continue
-            term_json: Dict[str, Any] = {"@id": schema.prefixedIdFromUri(term.uri)}
-            if getattr(term, "termType", None) == SdoTermType.PROPERTY:
-                types: Set[str] = _convertTypes([t.id for t in getattr(term, "rangeIncludes", [])])
-                if len(types) == 1:
-                    term_json["@type"] = types.pop()
-                elif len(types) > 1:
-                    term_json["@type"] = sorted(list(types))
-            json_context[term.id] = term_json
+            json_context[term.id] = {"@id": schema.prefixedIdFromUri(term.uri)}
         json_object: Dict[str, Any] = {"@context": json_context}
         return json.dumps(sort_dict(json_object), indent=2)

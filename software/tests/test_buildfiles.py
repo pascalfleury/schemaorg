@@ -52,21 +52,24 @@ class TestBuildFiles(unittest.TestCase):
             "https://schema.org/Person, https://schema.org/Thing",
         )
 
-    @unittest.mock.patch("util.schema.getOutputDir")
-    def testWriteCsvOut(self, mock_output_dir):
+    def testWriteCsvOut(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            mock_output_dir.return_value = temp_dir
-            buildfiles.writecsvout(
-                ftype="properties",
-                data=(
-                    {"id": "123", "value": "Fnuble"},
-                    {"id": "456", "value": "Blubrl"},
-                ),
-                fields=("id", "value"),
-                selector=fileutils.FileSelector.CURRENT,
-                protocol="http",
-                altprotocol="https",
-            )
+            orig_output = schema.config.OUTPUTDIR
+            try:
+                schema.config.OUTPUTDIR = temp_dir
+                buildfiles.writecsvout(
+                    ftype="properties",
+                    data=(
+                        {"id": "123", "value": "Fnuble"},
+                        {"id": "456", "value": "Blubrl"},
+                    ),
+                    fields=("id", "value"),
+                    selector=fileutils.FileSelector.CURRENT,
+                    protocol="http",
+                    altprotocol="https",
+                )
+            finally:
+                schema.config.OUTPUTDIR = orig_output
 
 
 if __name__ == "__main__":

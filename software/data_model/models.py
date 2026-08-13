@@ -5,9 +5,15 @@ from __future__ import annotations
 from typing import Annotated, List, Optional, Union, ClassVar, Any, Dict, Set
 from pydantic import Field, ConfigDict, computed_field, field_validator, PrivateAttr
 from pydantic_rdf import BaseRdfModel, WithPredicate
-from rdflib import RDFS, RDF, URIRef
+from rdflib import RDFS, RDF, URIRef, Namespace
+import SchemaExamples.schemaexamples as schemaexamples
+from SchemaTerms.localmarkdown import Markdown
+import SchemaTerms.sdocollaborators as sdocollaborators
 import util.schema as schema
+from . import registry
 from .type_map import SdoTermType
+
+SCHEMA = Namespace("https://schema.org/")
 
 class TermList(list):
     """List subclass that adds a convenience .ids getter for backward compatibility."""
@@ -23,7 +29,6 @@ class SdoTerm(BaseRdfModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
     
     rdf_type: ClassVar[URIRef] = RDFS.Resource
-    _stack_cleared: bool = PrivateAttr(default=False)
 
     label: Annotated[str, WithPredicate(RDFS.label)]
     comment: Annotated[Optional[str], WithPredicate(RDFS.comment)] = ""
@@ -32,15 +37,14 @@ class SdoTerm(BaseRdfModel):
     @classmethod
     def convert_markdown(cls, v: Optional[str]) -> Optional[str]:
         if v:
-            from SchemaTerms.localmarkdown import Markdown
             parsed = Markdown.parse(v)
             return parsed.strip() if parsed else parsed
         return v
-    isPartOf: Annotated[Optional[URIRef], WithPredicate(schema.URI.isPartOf)] = None
+    isPartOf: Annotated[Optional[URIRef], WithPredicate(SCHEMA.isPartOf)] = None
     
-    source_uris: Annotated[List[URIRef], WithPredicate(schema.URI.source)] = Field(default_factory=list)
-    contributor_uris: Annotated[List[URIRef], WithPredicate(schema.URI.contributor)] = Field(default_factory=list)
-    superseded_by_uri: Annotated[Optional[URIRef], WithPredicate(schema.URI.supersededBy)] = None
+    source_uris: Annotated[List[URIRef], WithPredicate(SCHEMA.source)] = Field(default_factory=list)
+    contributor_uris: Annotated[List[URIRef], WithPredicate(SCHEMA.contributor)] = Field(default_factory=list)
+    superseded_by_uri: Annotated[Optional[URIRef], WithPredicate(SCHEMA.supersededBy)] = None
     equivalent_uris: Annotated[List[URIRef], WithPredicate(URIRef("http://www.w3.org/2002/07/owl#equivalentClass"))] = Field(default_factory=list)
 
     # Metadata tracked by the system (not necessarily in the RDF graph predicates)
@@ -56,11 +60,10 @@ class SdoTerm(BaseRdfModel):
         if self.term_id:
             return self.term_id
         uri_str = str(self.uri)
-        if uri_str.startswith(schema.VOCABURI):
-            return uri_str[len(schema.VOCABURI) :]
-        if ".org/" in uri_str:
-            return uri_str.split(".org/")[-1]
-        return uri_str.split("/")[-1].split("#")[-1]
+        for prefix in ("https://schema.org/", "http://schema.org/"):
+            if uri_str.startswith(prefix):
+                return uri_str[len(prefix) :]
+        return uri_str
 
     def __str__(self) -> str:
         return self.id
@@ -71,10 +74,11 @@ class SdoTerm(BaseRdfModel):
 
     @property
     def examples(self) -> List[Any]:
-        import SchemaExamples.schemaexamples as schemaexamples
         return schemaexamples.SchemaExamples.examplesForTerm(self.id)
     @property
     def termType(self) -> Optional[str]:
+        if not schema.isSchemaUri(self.uri):
+            return "Reference"
         if isinstance(self, SdoProperty):
             return "Property"
         if isinstance(self, SdoDataType) or self.id == "DataType":
@@ -99,16 +103,15 @@ class SdoTerm(BaseRdfModel):
 
     @property
     def supersedes(self) -> List[str]:
-        from .registry import TermRegistry
-        registry = TermRegistry.get_instance()
+        reg = registry.TermRegistry.get_instance()
         return sorted([
-            t.id for t in registry.all_terms().values() 
+            t.id for t in reg.all_terms().values() 
             if getattr(t, "superseded_by_uri", None) == self.uri
         ])
 
     @property
     def sources(self) -> List[str]:
-        return [str(u) for u in self.source_uris]
+        return sorted([str(u) for u in self.source_uris])
 
     @property
     def extLayer(self) -> str:
@@ -116,21 +119,22 @@ class SdoTerm(BaseRdfModel):
 
     @property
     def equivalents(self) -> TermList:
-        from .registry import TermRegistry
-        registry = TermRegistry.get_instance()
+        term_registry = registry.TermRegistry.get_instance()
         eqs = []
         
         def get_or_create_ref(u: URIRef) -> SdoTerm:
-            t = registry.get(u)
+            t = term_registry.get(u)
             if t:
                 return t
             uri_str = str(u)
-            if ".org/" in uri_str:
-                label = uri_str.split(".org/")[-1]
-            else:
-                label = uri_str.split("/")[-1].split("#")[-1]
+            label = schema.prefixedIdFromUri(uri_str)
+            if label == uri_str:
+                if ".org/" in uri_str:
+                    label = uri_str.split(".org/")[-1]
+                else:
+                    label = uri_str.split("/")[-1].split("#")[-1]
             ref = SdoReference(uri=u, label=label)
-            registry.register(ref)
+            term_registry.register(ref)
             return ref
 
         for u in self.equivalent_uris:
@@ -142,16 +146,14 @@ class SdoTerm(BaseRdfModel):
             for u in getattr(self, "equivalent_property_uris", []):
                 eqs.append(get_or_create_ref(u))
                 
-        return TermList(sorted(list(set(eqs)), key=lambda x: x.id))
+        return TermList(sorted(list(set(eqs)), key=lambda x: schema.prefixedIdFromUri(str(x.uri))))
 
     @equivalents.setter
     def equivalents(self, value: List[Any]) -> None:
-        from rdflib import URIRef
         self.equivalent_uris = [URIRef(getattr(t, "uri", str(t))) for t in value]
 
     @property
     def acknowledgements(self) -> TermList:
-        import SchemaTerms.sdocollaborators as sdocollaborators
         acks = []
         for uri in self.contributor_uris:
             cont = sdocollaborators.collaborator.getContributor(str(uri))
@@ -163,34 +165,41 @@ class SdoTerm(BaseRdfModel):
     def supers(self) -> TermList:
         if not hasattr(self, "super_uris"):
             return TermList()
-        from .registry import TermRegistry
-        registry = TermRegistry.get_instance()
+        term_registry = registry.TermRegistry.get_instance()
         res = []
         for u in getattr(self, "super_uris", []):
-            t = registry.get(u)
-            if not t and "schema.org" in str(u):
-                stem = str(u).split("/")[-1].split("#")[-1]
-                t = self.__class__(id=stem, uri=str(u), label=stem)
+            t = term_registry.get(u)
+            if not t:
+                uri_str = str(u)
+                if schema.isSchemaUri(uri_str):
+                    stem = uri_str.split("/")[-1].split("#")[-1]
+                    t = self.__class__(id=stem, uri=str(u), label=stem)
+                else:
+                    label = schema.prefixedIdFromUri(uri_str)
+                    t = SdoReference(uri=u, label=label)
+                    term_registry.register(t)
+            elif not schema.isSchemaUri(u):
+                label = schema.prefixedIdFromUri(str(u))
+                if label != str(u) and hasattr(t, "label"):
+                    t.label = label
             if t: res.append(t)
         return TermList(sorted(res, key=lambda x: x.id))
 
     @supers.setter
     def supers(self, value: List[Any]) -> None:
-        from rdflib import URIRef
         self.super_uris = [URIRef(getattr(t, "uri", str(t))) for t in value]
 
     @property
     def subs(self) -> TermList:
-        from .registry import TermRegistry
-        registry = TermRegistry.get_instance()
+        term_registry = registry.TermRegistry.get_instance()
         
-        is_type = isinstance(self, SdoType)
+        is_type = isinstance(self, (SdoType, SdoDataType))
         is_prop = isinstance(self, SdoProperty)
         
         res = []
-        for t in registry.all_terms().values():
+        for t in term_registry.all_terms().values():
             if is_type:
-                compatible = isinstance(t, SdoType) or isinstance(t, SdoEnumerationvalue)
+                compatible = isinstance(t, (SdoType, SdoDataType, SdoEnumerationvalue))
             elif is_prop:
                 compatible = isinstance(t, SdoProperty)
             else:
@@ -200,14 +209,13 @@ class SdoTerm(BaseRdfModel):
                 res.append(t)
                 
         if isinstance(self, SdoDataType):
-            for t in registry.all_terms().values():
-                if isinstance(t, SdoEnumerationvalue) and any(u == self.uri for u in getattr(t, "enumeration_uris", [])):
-                    res.append(t)
-            if self.id == "DataType":
-                for t in registry.all_terms().values():
-                    if isinstance(t, SdoDataType) and t.id != "DataType":
-                        res.append(t)
-                        
+            g = getattr(term_registry, "_graph", None)
+            if g is not None:
+                for subj in g.subjects(RDF.type, self.uri):
+                    term = term_registry.get(subj)
+                    if term and not isinstance(term, SdoReference) and schema.isSchemaUri(term.uri):
+                        res.append(term)
+                
         return TermList(sorted(list(set(res)), key=lambda x: x.id))
 
     @subs.setter
@@ -216,43 +224,96 @@ class SdoTerm(BaseRdfModel):
 
     @property
     def termStack(self) -> TermList:
-        if self._stack_cleared:
-            return TermList()
-        stack = []
+        raw_stack = []
         for sup in self.supers:
-            if sup not in stack:
-                stack.append(sup)
-                for ancestor in getattr(sup, "termStack", []):
-                    if ancestor not in stack:
-                        stack.append(ancestor)
-        return TermList(stack)
+            if isinstance(sup, SdoReference) or getattr(sup, "termType", None) == "Reference":
+                continue
+            raw_stack.append(sup)
+            for ancestor in getattr(sup, "termStack", []):
+                if not isinstance(ancestor, SdoReference):
+                    raw_stack.append(ancestor)
+        
+        stack = []
+        for t in reversed(raw_stack):
+            if t not in stack:
+                stack.append(t)
+        return TermList(list(reversed(stack)))
 
     @property
     def _allproperties_stack(self) -> TermList:
-        stack = []
-        for sup in self.supers:
-            if sup not in stack:
-                stack.append(sup)
-                for ancestor in getattr(sup, "termStack", []):
-                    if ancestor not in stack:
-                        stack.append(ancestor)
-        return TermList(stack)
+        return self.termStack
 
     @property
     def superPaths(self) -> List[TermList]:
         if self.id == "Thing":
             return [TermList([self])]
-        if isinstance(self, SdoEnumerationvalue):
-            parent = getattr(self, "enumerationParent", None)
-            paths = getattr(parent, "superPaths", [])
-            return [TermList(p + [self]) for p in paths] or [TermList([self])]
-        if not self.supers:
+        if self.id == "DataType":
             return [TermList([self])]
-        paths = []
-        for parent in self.supers:
-            for path in getattr(parent, "superPaths", []):
-                paths.append(TermList(path + [self]))
-        return paths
+
+        term_registry = registry.TermRegistry.get_instance()
+
+        pstacks: List[List[Any]] = []
+        cstack: List[Any] = []
+        pstacks.append(cstack)
+
+        def _getParentPaths(curr: Any, cur_stack: List[Any]) -> None:
+            cur_stack.insert(0, curr)
+            tmpStacks: List[List[Any]] = [cur_stack]
+            super_terms: List[Any] = []
+            for s in getattr(curr, "supers", []):
+                if (
+                    schema.isSchemaUri(s.uri)
+                    and getattr(s, "termType", None) != "Reference"
+                    and not isinstance(s, SdoReference)
+                    and s != curr
+                ):
+                    super_terms.append(s)
+            if isinstance(curr, SdoEnumerationvalue) and getattr(curr, "enumerationParent", None):
+                ep = curr.enumerationParent
+                if ep not in super_terms:
+                    super_terms.append(ep)
+
+            if super_terms:
+                for i in range(1, len(super_terms)):
+                    t = cur_stack[:]
+                    tmpStacks.append(t)
+                    pstacks.append(t)
+                for x, parent in enumerate(super_terms):
+                    _getParentPaths(parent, tmpStacks[x])
+
+        _getParentPaths(self, cstack)
+
+        inserts: List[Any] = []
+        if isinstance(self, SdoProperty):
+            thing = term_registry.get_by_id("Thing")
+            prop = term_registry.get_by_id("Property")
+            inserts = [t for t in [prop, thing] if t]
+        elif isinstance(self, SdoDataType) and self.id != "DataType":
+            dt = term_registry.get_by_id("DataType")
+            if dt:
+                inserts = [dt]
+        elif isinstance(self, SdoType):
+            base = pstacks[0][0]
+            if base and (isinstance(base, SdoDataType) or getattr(base, "id", None) == "DataType"):
+                dt = term_registry.get_by_id("DataType")
+                if dt:
+                    inserts = [dt]
+            elif base and base.id != "Thing":
+                thing = term_registry.get_by_id("Thing")
+                if thing:
+                    inserts = [thing]
+
+        for ins in inserts:
+            for s in pstacks:
+                s.insert(0, ins)
+
+        for s in pstacks:
+            if s and s[0].id not in ("Thing", "DataType") and not isinstance(self, (SdoProperty, SdoDataType)):
+                thing = term_registry.get_by_id("Thing")
+                if thing and thing not in s:
+                    s.insert(0, thing)
+
+        return [TermList(p) for p in pstacks]
 
     def __hash__(self):
         return hash(self.uri)
@@ -269,10 +330,8 @@ class SdoType(SdoTerm):
 
     @property
     def properties(self) -> TermList:
-        from .registry import TermRegistry
-        from .models import SdoProperty
-        registry = TermRegistry.get_instance()
-        terms = [t for t in registry.all_terms().values() if isinstance(t, SdoProperty) and self.uri in getattr(t, "domain_uris", [])]
+        term_registry = registry.TermRegistry.get_instance()
+        terms = [t for t in term_registry.all_terms().values() if isinstance(t, SdoProperty) and self.uri in getattr(t, "domain_uris", [])]
         return TermList(sorted(terms, key=lambda x: x.id))
 
     @property
@@ -282,30 +341,27 @@ class SdoType(SdoTerm):
 
     @property
     def expectedTypeFor(self) -> TermList:
-        from .registry import TermRegistry
-        from .models import SdoProperty
-        registry = TermRegistry.get_instance()
-        terms = [t for t in registry.all_terms().values() if isinstance(t, SdoProperty) and self.uri in getattr(t, "range_uris", [])]
+        term_registry = registry.TermRegistry.get_instance()
+        terms = [t for t in term_registry.all_terms().values() if isinstance(t, SdoProperty) and self.uri in getattr(t, "range_uris", [])]
         return TermList(sorted(terms, key=lambda x: x.id))
 
 class SdoProperty(SdoTerm):
     """Model for Schema.org Properties."""
     rdf_type: ClassVar[URIRef] = RDF.Property
     
-    domain_uris: Annotated[List[URIRef], WithPredicate(schema.URI.domainIncludes)] = Field(default_factory=list)
-    range_uris: Annotated[List[URIRef], WithPredicate(schema.URI.rangeIncludes)] = Field(default_factory=list)
-    inverse_uri: Annotated[Optional[URIRef], WithPredicate(schema.URI.inverseOf)] = None
+    domain_uris: Annotated[List[URIRef], WithPredicate(SCHEMA.domainIncludes)] = Field(default_factory=list)
+    range_uris: Annotated[List[URIRef], WithPredicate(SCHEMA.rangeIncludes)] = Field(default_factory=list)
+    inverse_uri: Annotated[Optional[URIRef], WithPredicate(SCHEMA.inverseOf)] = None
     super_uris: Annotated[List[URIRef], WithPredicate(RDFS.subPropertyOf)] = Field(default_factory=list)
     equivalent_property_uris: Annotated[List[URIRef], WithPredicate(URIRef("http://www.w3.org/2002/07/owl#equivalentProperty"))] = Field(default_factory=list)
 
     @property
     def domainIncludes(self) -> TermList:
-        from .registry import TermRegistry
-        registry = TermRegistry.get_instance()
+        term_registry = registry.TermRegistry.get_instance()
         res = []
         for u in self.domain_uris:
-            t = registry.get(u)
-            if not t and "schema.org" in str(u):
+            t = term_registry.get(u)
+            if not t and schema.isSchemaUri(u):
                 stem = str(u).split("/")[-1].split("#")[-1]
                 t = SdoType(id=stem, uri=str(u), label=stem)
             if t: res.append(t)
@@ -313,17 +369,15 @@ class SdoProperty(SdoTerm):
 
     @domainIncludes.setter
     def domainIncludes(self, value: List[Any]) -> None:
-        from rdflib import URIRef
         self.domain_uris = [URIRef(getattr(t, "uri", str(t))) for t in value]
 
     @property
     def rangeIncludes(self) -> TermList:
-        from .registry import TermRegistry
-        registry = TermRegistry.get_instance()
+        term_registry = registry.TermRegistry.get_instance()
         res = []
         for u in self.range_uris:
-            t = registry.get(u)
-            if not t and "schema.org" in str(u):
+            t = term_registry.get(u)
+            if not t and schema.isSchemaUri(u):
                 stem = str(u).split("/")[-1].split("#")[-1]
                 t = SdoType(id=stem, uri=str(u), label=stem)
             if t: res.append(t)
@@ -331,7 +385,6 @@ class SdoProperty(SdoTerm):
 
     @rangeIncludes.setter
     def rangeIncludes(self, value: List[Any]) -> None:
-        from rdflib import URIRef
         self.range_uris = [URIRef(getattr(t, "uri", str(t))) for t in value]
 
     @property
@@ -351,14 +404,12 @@ class SdoProperty(SdoTerm):
 
     @property
     def inverse(self) -> Optional["SdoProperty"]:
-        from .registry import TermRegistry
-        from .models import SdoProperty
-        registry = TermRegistry.get_instance()
+        term_registry = registry.TermRegistry.get_instance()
         res = None
         if self.inverse_uri:
-            res = registry.get(self.inverse_uri)
+            res = term_registry.get(self.inverse_uri)
         if not res:
-            for t in registry.all_terms().values():
+            for t in term_registry.all_terms().values():
                 if isinstance(t, SdoProperty) and getattr(t, "inverse_uri", None) == self.uri:
                     res = t
                     break
@@ -372,12 +423,20 @@ class SdoEnumeration(SdoType):
     """Model for Schema.org Enumerations."""
 
     @property
+    def termStack(self) -> TermList:
+        if not self.properties:
+            return TermList()
+        return super().termStack
+
+    @property
+    def _allproperties_stack(self) -> TermList:
+        return super().termStack
+
+    @property
     def enumerationMembers(self) -> TermList:
-        from .registry import TermRegistry
-        from .models import SdoEnumerationvalue
-        registry = TermRegistry.get_instance()
+        term_registry = registry.TermRegistry.get_instance()
         res = [
-            t for t in registry.all_terms().values() 
+            t for t in term_registry.all_terms().values() 
             if isinstance(t, SdoEnumerationvalue) and any(str(u).split("/")[-1] == self.id for u in t.enumeration_uris)
         ]
         return TermList(sorted(res, key=lambda x: x.id))
@@ -396,9 +455,7 @@ class SdoEnumerationvalue(SdoTerm):
     def enumerationParent(self) -> Optional["SdoEnumeration"]:
         if not self.enumeration_uri:
             return None
-        from .registry import TermRegistry
-        from .models import SdoEnumeration
-        t = TermRegistry.get_instance().get(self.enumeration_uri)
+        t = registry.TermRegistry.get_instance().get(self.enumeration_uri)
         return t if isinstance(t, SdoEnumeration) else None
 
 class SdoReference(SdoTerm):

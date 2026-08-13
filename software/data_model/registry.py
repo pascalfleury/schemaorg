@@ -4,6 +4,8 @@
 from __future__ import annotations
 from typing import Dict, List, Optional, Any
 from rdflib import URIRef
+import util.schema as schema
+from . import models
 
 class TermRegistry:
     """Central registry for all Schema.org terms identified by their full URIs or short IDs."""
@@ -32,15 +34,14 @@ class TermRegistry:
             self._id_index[term_id] = uri
             return
 
-        new_is_schema = "schema.org" in str(uri)
-        old_is_schema = "schema.org" in str(existing_uri)
+        new_is_schema = schema.isSchemaUri(uri)
+        old_is_schema = schema.isSchemaUri(existing_uri)
         
         if new_is_schema and not old_is_schema:
             self._id_index[term_id] = uri
             return
 
         if new_is_schema and old_is_schema:
-            import util.schema as schema
             vocab_uri = getattr(schema, "VOCABURI", "https://schema.org/")
             if str(uri).startswith(vocab_uri) and not str(existing_uri).startswith(vocab_uri):
                 self._id_index[term_id] = uri
@@ -62,8 +63,7 @@ class TermRegistry:
         """Retrieves a term by its short ID (e.g., 'Hotel') or full URI."""
         if not term_id:
             return None
-        from .models import SdoTerm
-        if isinstance(term_id, SdoTerm):
+        if isinstance(term_id, models.SdoTerm):
             return term_id
         if hasattr(term_id, "uri"):
             return self.get(URIRef(getattr(term_id, "uri")))
@@ -80,55 +80,74 @@ class TermRegistry:
         """Returns all registered terms."""
         return self._terms.copy()
 
+    @staticmethod
+    def _filter_layer(terms: List[Any], layer: Optional[str]) -> List[Any]:
+        if not layer:
+            return terms
+        if layer == "core":
+            return [t for t in terms if not getattr(t, "isPartOf", None)]
+        return [
+            t for t in terms 
+            if getattr(t, "layer", None) == layer 
+            or layer in str(getattr(t, "isPartOf", ""))
+        ]
+
     def get_all_terms(self, layer: Optional[str] = None) -> List[Any]:
-        terms = list(self._terms.values())
-        if layer:
-            terms = [t for t in terms if getattr(t, "layer", None) == layer]
-        return terms
+        terms = [t for t in self._terms.values() if schema.isSchemaUri(t.uri)]
+        return self._filter_layer(terms, layer)
 
     def get_all_types(self, layer: Optional[str] = None) -> List[Any]:
-        from .models import SdoType
-        terms = [t for t in self._terms.values() if isinstance(t, SdoType)]
-        if layer:
-            terms = [t for t in terms if getattr(t, "layer", None) == layer]
-        return terms
+        terms = [
+            t for t in self._terms.values() 
+            if isinstance(t, models.SdoType) and not isinstance(t, (models.SdoEnumeration, models.SdoDataType)) and schema.isSchemaUri(t.uri)
+        ]
+        return self._filter_layer(terms, layer)
 
     def get_all_properties(self, layer: Optional[str] = None) -> List[Any]:
-        from .models import SdoProperty
-        terms = [t for t in self._terms.values() if isinstance(t, SdoProperty)]
-        if layer:
-            terms = [t for t in terms if getattr(t, "layer", None) == layer]
-        return terms
+        terms = [t for t in self._terms.values() if isinstance(t, models.SdoProperty) and schema.isSchemaUri(t.uri)]
+        return self._filter_layer(terms, layer)
 
     def get_all_datatypes(self, layer: Optional[str] = None) -> List[Any]:
-        from .models import SdoDataType
-        terms = [t for t in self._terms.values() if isinstance(t, SdoDataType)]
-        if layer:
-            terms = [t for t in terms if getattr(t, "layer", None) == layer]
-        return terms
+        terms = [t for t in self._terms.values() if isinstance(t, models.SdoDataType) and schema.isSchemaUri(t.uri)]
+        return self._filter_layer(terms, layer)
 
     def get_all_enumerations(self, layer: Optional[str] = None) -> List[Any]:
-        from .models import SdoEnumeration
-        terms = [t for t in self._terms.values() if isinstance(t, SdoEnumeration)]
-        if layer:
-            terms = [t for t in terms if getattr(t, "layer", None) == layer]
-        return terms
+        terms = [t for t in self._terms.values() if isinstance(t, models.SdoEnumeration) and schema.isSchemaUri(t.uri)]
+        return self._filter_layer(terms, layer)
 
     def get_all_enumerationvalues(self, layer: Optional[str] = None) -> List[Any]:
-        from .models import SdoEnumerationvalue
-        terms = [t for t in self._terms.values() if isinstance(t, SdoEnumerationvalue)]
-        if layer:
-            terms = [t for t in terms if getattr(t, "layer", None) == layer]
-        return terms
+        terms = [t for t in self._terms.values() if isinstance(t, models.SdoEnumerationvalue) and schema.isSchemaUri(t.uri)]
+        return self._filter_layer(terms, layer)
 
     def termCounts(self) -> Dict[str, int]:
+        types = self.get_all_types()
+        props = self.get_all_properties()
+        dts = self.get_all_datatypes()
+        enums = self.get_all_enumerations()
+        enumvals = self.get_all_enumerationvalues()
+
+        dt_uris = {t.uri for t in dts}
+        dt_class_uris = set()
+        for t in types:
+            if any(u in dt_uris for u in getattr(t, "super_uris", [])):
+                dt_class_uris.add(t.uri)
+        for t in types:
+            if any(u in dt_class_uris for u in getattr(t, "super_uris", [])):
+                dt_class_uris.add(t.uri)
+
+        types_count = len(types) - len(dt_class_uris)
+        dts_count = len([d for d in dts if d.id != "DataType"]) + len(dt_class_uris)
+        props_count = len(props)
+        enums_count = len(enums)
+        enumvals_count = len(enumvals)
+
         counts = {
-            "Type": len(self.get_all_types()),
-            "Property": len(self.get_all_properties()),
-            "Datatype": len(self.get_all_datatypes()),
-            "Enumeration": len(self.get_all_enumerations()),
-            "Enumerationvalue": len(self.get_all_enumerationvalues()),
-            "All": len(self._terms)
+            "Type": types_count,
+            "Property": props_count,
+            "Datatype": dts_count,
+            "Enumeration": enums_count,
+            "Enumerationvalue": enumvals_count,
+            "All": types_count + props_count + dts_count + enums_count + enumvals_count
         }
         return counts
 

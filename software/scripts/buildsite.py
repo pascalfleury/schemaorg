@@ -11,6 +11,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import rdflib
 import shutil
 import subprocess
 import sys
@@ -163,7 +164,7 @@ def initialize() -> argparse.Namespace:
     if args.output:
         schema.config.OUTPUTDIR = args.output
 
-    if args.autobuild or args.release or args.shacltests or args.buildrelease:
+    if args.autobuild or args.release or args.shacltests or args.buildrelease or args.buildsite:
         schema.config.TERMS = ["ALL"]
         schema.config.PAGES = ["ALL"]
         schema.config.FILES = ["ALL"]
@@ -278,7 +279,6 @@ def loadTerms(source: Optional[str] = None, force: bool = False) -> None:
                 )
 
             with pretty_logger.BlockLog(logger=log, message=f"Loading triples from release file {release_file}"):
-                import rdflib
                 g = rdflib.Graph()
                 g.parse(str(release_file), format="turtle")
                 loader = GraphLoader(g, registry)

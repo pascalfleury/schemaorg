@@ -15,6 +15,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Type
 
 import jinja2
 import json
+from rdflib import Graph
 from util.sort_dict import sort_dict
 
 import software
@@ -54,17 +55,15 @@ def termFileName(termid: str) -> str:
 def _get_term_as_rdf_string(term: SdoTerm, output_format: str, full: bool = False) -> str:
     registry = TermRegistry.get_instance()
     g_source = getattr(registry, "_graph", None)
-    if not g_source or not term or getattr(term, "termType", None) == SdoTermType.REFERENCE:
+    if not g_source or not term or getattr(term, "termType", None) == SdoTermType.REFERENCE or isinstance(term, SdoReference):
         return ""
 
-    from rdflib import Graph, URIRef
     g = Graph()
-    g.bind("schema", schema.URI)
-    from software.data_model.loader import NAMESPACES
-    for prefix, uri in NAMESPACES.items():
-        g.bind(prefix, URIRef(uri))
+    g.bind("schema", schema.VOCABURI)
 
     def triples_for_term(t):
+        if not t or isinstance(t, SdoReference) or getattr(t, "termType", None) == SdoTermType.REFERENCE or not schema.isSchemaUri(t.uri):
+            return []
         return g_source.triples((t.uri, None, None))
 
     if not full:
@@ -89,7 +88,7 @@ def _get_term_as_rdf_string(term: SdoTerm, output_format: str, full: bool = Fals
         seen = set()
         dedup_terms = []
         for t in terms_to_add:
-            if t.uri not in seen:
+            if t and t.uri not in seen and not isinstance(t, SdoReference) and schema.isSchemaUri(t.uri):
                 seen.add(t.uri)
                 dedup_terms.append(t)
 
@@ -231,7 +230,7 @@ def buildTerms(term_ids: Iterable[str], config: Optional[Dict[str, Any]] = None)
     tic: float = time.perf_counter()
     if any(fileutils.isAll(tid) for tid in term_ids):
         log.info("Loading all term identifiers")
-        term_ids = [t.id for t in TermRegistry.get_instance().get_all_terms() if not isinstance(t, SdoReference) and "schema.org" in str(t.uri)]
+        term_ids = [t.id for t in TermRegistry.get_instance().get_all_terms() if not isinstance(t, SdoReference) and schema.isSchemaUri(t.uri)]
 
     term_list: List[str] = list(term_ids)
     if not term_list:

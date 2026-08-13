@@ -29,7 +29,7 @@ log: logging.Logger = logging.getLogger(__name__)
 
 
 def generateTerms(tags: bool = False) -> Generator[str, None, None]:
-    terms = TermRegistry.get_instance().get_all_terms()
+    terms = sorted(TermRegistry.get_instance().get_all_terms(), key=lambda t: str(t.uri))
     for term in terms:
         if not isinstance(term, SdoTerm):
             continue

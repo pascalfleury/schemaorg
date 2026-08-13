@@ -4,6 +4,9 @@
 
 import os
 import sys
+import time
+import datetime
+
 if os.getcwd() not in sys.path:
     sys.path.insert(1, os.getcwd())
 import software
@@ -12,6 +15,7 @@ from software.util.paths import DefaultInputLayout
 from software.data_model.loader import GraphLoader
 from software.data_model.registry import TermRegistry
 from SchemaTerms.localmarkdown import Markdown
+from schematermsprotobuf import sdotermToProtobuf, sdotermToProtobufMsg, sdotermToProtobufText, protobufToMsg, protobufToText
 
 Markdown.setWikilinkCssClass("localLink")
 Markdown.setWikilinkPrePath("/")
@@ -23,10 +27,6 @@ loader.load_all()
 registry = TermRegistry.get_instance()
 terms = [t.id for t in registry.all_terms().values() if t.id]
 print("Terms Count: %s" % len(terms))
-
-from schematermsprotobuf import sdotermToProtobuf, sdotermToProtobufMsg, sdotermToProtobufText, protobufToMsg, protobufToText
-
-import time,datetime
 
 start = datetime.datetime.now() #debug
 for t in terms:

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import logging
 from typing import Dict, List, Optional, Set, Type, Union, Any
 
 from rdflib import Graph, RDF, RDFS, URIRef
-from util.paths import InputLayout, Domain
+import util.paths as paths
 import util.schema as schema
-from util.schema import URI
 from .models import SdoType, SdoDataType, SdoEnumeration, SdoEnumerationvalue, SdoProperty, SdoTerm
 from .registry import TermRegistry
 
@@ -84,12 +85,11 @@ class GraphLoader:
             self.graph.bind(prefix, URIRef(uri))
 
     @classmethod
-    def from_layout(cls, layout: InputLayout, vocaburi: Optional[str] = None) -> "GraphLoader":
-        import util.schema as schema
+    def from_layout(cls, layout: paths.InputLayout, vocaburi: Optional[str] = None) -> "GraphLoader":
         if vocaburi:
             schema.setVocabUri(vocaburi)
         g = Graph()
-        files = layout.domain_files(Domain.DATA, ["*.ttl", "ext/**/*.ttl"])
+        files = layout.domain_files(paths.Domain.DATA, ["*.ttl", "ext/**/*.ttl"])
         for f in sorted(files):
             try:
                 g.parse(str(f), format="turtle")
@@ -131,15 +131,15 @@ class GraphLoader:
         field_map = {
             RDFS.label: "label",
             RDFS.comment: "comment",
-            URI.isPartOf: "isPartOf",
-            URI.source: "source_uris",
-            URI.contributor: "contributor_uris",
-            URI.supersededBy: "superseded_by_uri",
+            schema.URI.isPartOf: "isPartOf",
+            schema.URI.source: "source_uris",
+            schema.URI.contributor: "contributor_uris",
+            schema.URI.supersededBy: "superseded_by_uri",
             RDFS.subClassOf: "super_uris",
             RDFS.subPropertyOf: "super_uris",
-            URI.domainIncludes: "domain_uris",
-            URI.rangeIncludes: "range_uris",
-            URI.inverseOf: "inverse_uri",
+            schema.URI.domainIncludes: "domain_uris",
+            schema.URI.rangeIncludes: "range_uris",
+            schema.URI.inverseOf: "inverse_uri",
             URIRef("http://www.w3.org/2002/07/owl#equivalentClass"): "equivalent_uris",
             URIRef("http://www.w3.org/2002/07/owl#equivalentProperty"): "equivalent_property_uris",
         }
@@ -157,7 +157,7 @@ class GraphLoader:
 
         # 3. Instantiate and register Class/Property terms
         for uri, data in term_data.items():
-            is_schema = "schema.org" in str(uri)
+            is_schema = schema.isSchemaUri(uri)
             types = term_types.get(uri, set())
             
             # Ensure mandatory fields have at least a default if missing in graph
@@ -165,20 +165,16 @@ class GraphLoader:
                 if is_schema:
                     data["label"] = str(uri).split("/")[-1].split("#")[-1]
                 else:
-                    try:
-                        qname = self.graph.namespace_manager.compute_qname(uri)
-                        data["label"] = f"{qname[0]}:{qname[2]}"
-                    except Exception:
-                        data["label"] = str(uri).split("/")[-1].split("#")[-1]
+                    data["label"] = schema.prefixedIdFromUri(str(uri))
 
             obj: Any = None
             try:
                 if RDF.Property in types:
                     obj = SdoProperty.model_validate(data)
-                elif RDFS.Class in types or URI.DataType in types or URIRef("https://schema.org/DataType") in types:
-                    if URI.DataType in types or URIRef("https://schema.org/DataType") in types or self._is_subclass_of(uri, URI.DataType) or self._is_subclass_of(uri, URIRef("https://schema.org/DataType")):
+                elif RDFS.Class in types or schema.URI.DataType in types or URIRef("https://schema.org/DataType") in types:
+                    if schema.URI.DataType in types or URIRef("https://schema.org/DataType") in types or uri in (schema.URI.DataType, URIRef("https://schema.org/DataType"), URIRef("http://schema.org/DataType")):
                         obj = SdoDataType.model_validate(data)
-                    elif self._is_subclass_of(uri, URI.Enumeration) or self._is_subclass_of(uri, URIRef("https://schema.org/Enumeration")):
+                    elif self._is_subclass_of(uri, schema.URI.Enumeration) or self._is_subclass_of(uri, URIRef("https://schema.org/Enumeration")):
                         obj = SdoEnumeration.model_validate(data)
                     else:
                         obj = SdoType.model_validate(data)
@@ -194,26 +190,20 @@ class GraphLoader:
         # We need to find classes that are subclasses of Enumeration
         query_enums = f"""
         SELECT ?val ?enum ?label ?comment ?isPartOf WHERE {{
-            {{
-                ?enum <{RDFS.subClassOf}>* ?rootEnum .
-                FILTER(?rootEnum IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>))
-            }} UNION {{
-                ?enum <{RDFS.subClassOf}>* ?parent .
-                ?parent a ?dataTypeClass .
-                FILTER(?dataTypeClass IN (<http://schema.org/DataType>, <https://schema.org/DataType>))
-            }}
+            ?enum <{RDFS.subClassOf}>* ?rootEnum .
+            FILTER(?rootEnum IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>))
             ?val a ?enum .
-            FILTER(?enum NOT IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>, <http://schema.org/DataType>, <https://schema.org/DataType>))
+            FILTER(?enum NOT IN (<http://schema.org/Enumeration>, <https://schema.org/Enumeration>))
             OPTIONAL {{ ?val <{RDFS.label}> ?label }}
             OPTIONAL {{ ?val <{RDFS.comment}> ?comment }}
-            OPTIONAL {{ ?val <{URI.isPartOf}> ?isPartOf }}
+            OPTIONAL {{ ?val <{schema.URI.isPartOf}> ?isPartOf }}
             OPTIONAL {{ ?val <https://schema.org/isPartOf> ?isPartOf }}
         }}
         """
         enum_vals_data: Dict[URIRef, Dict[str, Any]] = {}
         for val, enum, label, comment, is_part_of in self.graph.query(query_enums):
             if isinstance(val, URIRef):
-                if "schema.org" not in str(val):
+                if not schema.isSchemaUri(val):
                     continue
                 data = enum_vals_data.setdefault(val, {
                     "uri": val,
@@ -229,7 +219,7 @@ class GraphLoader:
             try:
                 super_uris = [o for o in self.graph.objects(uri, RDFS.subClassOf) if isinstance(o, URIRef)]
                 equivalent_uris = [o for o in self.graph.objects(uri, URIRef("http://www.w3.org/2002/07/owl#equivalentClass")) if isinstance(o, URIRef)]
-                superseded_by = next(self.graph.objects(uri, URI.supersededBy), None) or next(self.graph.objects(uri, URIRef("https://schema.org/supersededBy")), None)
+                superseded_by = next(self.graph.objects(uri, schema.URI.supersededBy), None) or next(self.graph.objects(uri, URIRef("https://schema.org/supersededBy")), None)
                 
                 source_uris = list(self.graph.objects(uri, URIRef("http://schema.org/source"))) + list(self.graph.objects(uri, URIRef("https://schema.org/source")))
                 source_uris = list(set([o for o in source_uris if isinstance(o, URIRef)]))
@@ -245,16 +235,47 @@ class GraphLoader:
                     "contributor_uris": contributor_uris
                 })
                 
-                val = SdoEnumerationvalue.model_validate(data)
-                self._enrich_metadata(val)
-                self.registry.register(val)
+                val_obj = SdoEnumerationvalue.model_validate(data)
+                self._enrich_metadata(val_obj)
+                self.registry.register(val_obj)
             except Exception as e:
                 log.warning(f"Failed to load enum value {uri}: {e}")
 
-        # Clear termStack for Enumerations with no properties (matching old codebase bug)
-        for term in list(self.registry.all_terms().values()):
-            if isinstance(term, SdoEnumeration) and term.id != "Enumeration" and not term.properties:
-                term._stack_cleared = True
+        # 5. Handle DataType instances (e.g. True, False)
+        query_dt_vals = f"""
+        SELECT ?val ?dt ?label ?comment ?isPartOf WHERE {{
+            {{
+                ?dt a ?dtType .
+                FILTER(?dtType IN (<http://schema.org/DataType>, <https://schema.org/DataType>))
+            }} UNION {{
+                ?dt <{RDFS.subClassOf}>* ?rootDt .
+                FILTER(?rootDt IN (<http://schema.org/DataType>, <https://schema.org/DataType>))
+            }}
+            ?val a ?dt .
+            FILTER(?dt NOT IN (<http://schema.org/DataType>, <https://schema.org/DataType>, <{RDFS.Class}>, <{RDF.Property}>))
+            OPTIONAL {{ ?val <{RDFS.label}> ?label }}
+            OPTIONAL {{ ?val <{RDFS.comment}> ?comment }}
+            OPTIONAL {{ ?val <{schema.URI.isPartOf}> ?isPartOf }}
+            OPTIONAL {{ ?val <https://schema.org/isPartOf> ?isPartOf }}
+        }}
+        """
+        for val, dt, label, comment, is_part_of in self.graph.query(query_dt_vals):
+            if isinstance(val, URIRef) and schema.isSchemaUri(val):
+                if self.registry.get(val):
+                    continue
+                try:
+                    dt_data = {
+                        "uri": val,
+                        "label": str(label or str(val).split("/")[-1]),
+                        "comment": str(comment or ""),
+                        "isPartOf": is_part_of,
+                        "super_uris": []
+                    }
+                    dt_obj = SdoDataType.model_validate(dt_data)
+                    self._enrich_metadata(dt_obj)
+                    self.registry.register(dt_obj)
+                except Exception as e:
+                    log.warning(f"Failed to load datatype value {val}: {e}")
 
         return len(self.registry)
 
@@ -279,5 +300,18 @@ class GraphLoader:
             return True
         for sup in self.graph.objects(uri, RDFS.subClassOf):
             if isinstance(sup, URIRef) and self._is_subclass_of(sup, parent):
+                return True
+        return False
+
+    def _is_datatype(self, uri: URIRef) -> bool:
+        """Recursive check if a URI is a DataType or subclass/instance thereof."""
+        dt_uris = {schema.URI.DataType, URIRef("http://schema.org/DataType"), URIRef("https://schema.org/DataType")}
+        if uri in dt_uris:
+            return True
+        for t in self.graph.objects(uri, RDF.type):
+            if t in dt_uris:
+                return True
+        for sup in self.graph.objects(uri, RDFS.subClassOf):
+            if isinstance(sup, URIRef) and self._is_datatype(sup):
                 return True
         return False
