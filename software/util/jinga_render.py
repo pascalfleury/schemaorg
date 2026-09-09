@@ -10,8 +10,6 @@ from typing import Any, Dict, Optional, Union
 
 import jinja2
 
-import software
-
 import util.schema as schema
 
 
