@@ -11,9 +11,12 @@ import logging
 import os
 from pathlib import Path
 import sys
+from typing import FrozenSet, List, NamedTuple, Optional
 
+import owlrl
 import pyshacl
 import rdflib
+from rdflib.namespace import RDF, SH
 
 if os.getcwd() not in sys.path:
     sys.path.insert(1, os.getcwd())
@@ -36,9 +39,94 @@ def load_examples() -> list:
     return examples
 
 
+class ExampleResult(NamedTuple):
+    """Outcome of validating one example."""
+
+    example: schemaexamples.Example
+    #: A shape targeted a declared type. Untargeted means uninspected, not valid.
+    targeted: bool
+    conforms: bool
+    #: SHACL report, failures only.
+    report: Optional[str]
+    #: Not validatable at all, e.g. bad JSON. Distinct from conforms=False.
+    error: Optional[str]
+
+    @property
+    def name(self) -> str:
+        return self.example.getKey()
+
+
+class ExampleValidator:
+    """Validates examples against one fixed set of SHACL shapes."""
+
+    def __init__(self, shacl_graph: rdflib.Graph, ont_graph: rdflib.Graph) -> None:
+        """Prepare the graphs once.
+
+        Args:
+            shacl_graph: generated shapes.
+            ont_graph: subclass ontology. RDFS-closed in place.
+
+        Raises:
+            ValueError: if the shapes declare no sh:targetClass.
+        """
+        self.shacl_graph = shacl_graph
+        self.ont_graph = ont_graph
+
+        # Closed once so validate() can run with inference="none".
+        owlrl.DeductiveClosure(owlrl.RDFS_Semantics).expand(self.ont_graph)
+
+        self.target_classes: FrozenSet[str] = frozenset(
+            str(t) for t in self.shacl_graph.objects(None, SH.targetClass)
+        )
+        if not self.target_classes:
+            raise ValueError(
+                "the shapes declare no sh:targetClass, so they can never "
+                "select a focus node. Regenerate the shapes."
+            )
+
+    def validate(self, example: schemaexamples.Example) -> ExampleResult:
+        """Validate one example's JSON-LD against the shapes.
+
+        Never raises: parse and validation failures are reported in the
+        result's `error` field.
+        """
+        try:
+            data_graph = rdflib.Graph()
+            data_graph.parse(data=example.getJsonldRaw(), format="json-ld")
+
+            declared_types = {str(t) for t in data_graph.objects(None, RDF.type)}
+            targeted = bool(declared_types & self.target_classes)
+
+            conforms, _, report = pyshacl.validate(
+                data_graph,
+                shacl_graph=self.shacl_graph,
+                ont_graph=self.ont_graph,
+                inference="none",
+                abort_on_first=False,
+                max_validation_depth=200,
+            )
+
+            return ExampleResult(
+                example=example,
+                targeted=targeted,
+                conforms=bool(conforms),
+                report=None if conforms else report,
+                error=None,
+            )
+        except Exception as exception:  # noqa: BLE001 - reported, not swallowed
+            return ExampleResult(
+                example=example,
+                targeted=False,
+                conforms=False,
+                report=None,
+                error=str(exception),
+            )
+
+
 def validate_examples(examples: list, invalid_only: bool, source_output: bool) -> None:
     """Validates the provided examples against the generated SHACL shapes."""
     version: str = schema.getVersion()
+
     shacl_file: Path = paths.DefaultOutputLayout().domain_file(paths.Domain.RELEASE, "schemaorg-shapes.shacl")
     subclass_file: Path = paths.DefaultOutputLayout().domain_file(paths.Domain.RELEASE, "schemaorg-subclasses.shacl")
 
@@ -53,48 +141,69 @@ def validate_examples(examples: list, invalid_only: bool, source_output: bool) -
     ont_graph: rdflib.Graph = rdflib.Graph()
     ont_graph.parse(source=str(subclass_file), format="turtle")
 
-    count: int = 0
+    # The constructor RDFS-closes ont_graph in place.
+    before: int = len(ont_graph)
+    try:
+        engine = ExampleValidator(shacl_graph=shacl_graph, ont_graph=ont_graph)
+    except ValueError as exception:
+        log.error(f"SHACL gate is dead: {exception}")
+        sys.exit(os.EX_CONFIG)
+
+    log.info(f"Subclass ontology RDFS-closed: {before} -> {len(ont_graph)} triples")
+    log.info(f"Shapes declare {len(engine.target_classes)} target classes")
+
+    log.info(f"Validating {len(examples)} examples")
+    eval_results: List[ExampleResult] = []
+    for example in examples:
+        eval_results.append(engine.validate(example))
+
+    count: int = len(eval_results)
     error_count: int = 0
+    targeted_count: int = 0
 
-    for ex in examples:
-        count += 1
-        name = ex.getKey()
-
+    for result in eval_results:
         if not invalid_only:
-            log.info(f"Validating example {name}")
+            log.info(f"Validating example {result.name}")
 
-        try:
-            data_graph: rdflib.Graph = rdflib.Graph()
-            data_graph.parse(data=ex.getJsonldRaw(), format="json-ld")
+        if result.targeted:
+            targeted_count += 1
 
-            conforms, results_graph, results_text = pyshacl.validate(
-                data_graph,
-                shacl_graph=shacl_graph,
-                ont_graph=ont_graph,
-                inference="rdfs",
-                abort_on_first=False,
-                max_validation_depth=200
-            )
-
-            if not conforms:
-                error_count += 1
-                log.error(f"Validation failed for example {name}:\n{results_text}")
-                if source_output:
-                    source = "\n".join([f"{i:4d}: {x.rstrip()}" for i, x in enumerate(ex.getJsonldRaw().splitlines(), start=1)])
-                    log.info(f"Source:\n{source}")
-        except Exception as exception:
+        if result.error is not None:
             error_count += 1
-            log.error(f"Invalid JSON example {name}: {exception}")
-            if source_output:
-                source = "\n".join([f"{i:4d}: {x.rstrip()}" for i, x in enumerate(ex.getJsonldRaw().splitlines(), start=1)])
-                log.info(f"Source:\n{source}")
+            log.error(f"Invalid JSON example {result.name}: {result.error}")
+        elif not result.conforms:
+            error_count += 1
+            log.error(
+                f"Validation failed for example {result.name}:\n{result.report}"
+            )
+        else:
+            continue
 
-    log.info(f"Done: Processed {count} examples")
+        if source_output:
+            source = "\n".join(
+                f"{i:4d}: {line.rstrip()}"
+                for i, line in enumerate(
+                    result.example.getJsonldRaw().splitlines(), start=1
+                )
+            )
+            log.info(f"Source:\n{source}")
+
+    log.info(
+        f"Done: Processed {count} examples, "
+        f"{targeted_count} of which matched at least one shape"
+    )
     if error_count:
         log.error(f"Found {error_count} invalid examples")
         sys.exit(1)
-    else:
-        log.info("All examples validated successfully.")
+
+    if count and not targeted_count:
+        log.error(
+            f"SHACL gate inspected none of the {count} examples: no example "
+            "declares a type that any shape targets."
+        )
+        sys.exit(os.EX_CONFIG)
+
+    log.info("All examples validated successfully.")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -108,4 +217,8 @@ if __name__ == "__main__":
         schema.config.OUTPUTDIR = args.output
 
     examples = load_examples()
-    validate_examples(examples=examples, invalid_only=args.invalidonly, source_output=args.sourceoutput)
+    validate_examples(
+        examples=examples,
+        invalid_only=args.invalidonly,
+        source_output=args.sourceoutput,
+    )

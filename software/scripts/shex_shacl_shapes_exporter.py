@@ -42,6 +42,36 @@ def replace_prefix(data: URIRef) -> URIRef:
     return BASE[f"{PREFIX}{str(data).replace('http://schema.org/', '')}"]
 
 
+def collect_datatypes(source: Graph) -> Set[URIRef]:
+    """
+    Collects every term that must be serialised as a literal-bearing shape.
+
+    That is schema:DataType itself, everything declared a subclass of it, and
+    every instance of it (schema:Text, schema:Date, ...) together with their
+    subclasses.
+
+    Both exporters need exactly this set. Keeping a single copy matters: when
+    the ShEx and SHACL exporters computed it separately they were free to
+    drift, and a shape that is wrongly classed as a non-datatype gets
+    `sh:nodeKind sh:BlankNodeOrIRI`, which forbids it from ever being a
+    literal and fails every example that uses it.
+    """
+    datatypes: Set[URIRef] = {URIRef(SCHEMA.DataType)}
+
+    for dt_sub in source.transitive_subjects(RDFS.subClassOf, SCHEMA.DataType):
+        if isinstance(dt_sub, URIRef):
+            datatypes.add(dt_sub)
+
+    for dt_inst in source.subjects(RDF.type, SCHEMA.DataType):
+        if isinstance(dt_inst, URIRef):
+            datatypes.add(dt_inst)
+            for dt_sub in source.transitive_subjects(RDFS.subClassOf, dt_inst):
+                if isinstance(dt_sub, URIRef):
+                    datatypes.add(dt_sub)
+
+    return datatypes
+
+
 class ShExJParser:
     _ancestor_cache: Dict[URIRef, List[URIRef]] = {}
     _domain_includes: Dict[URIRef, List[URIRef]] = {}
@@ -185,20 +215,7 @@ class ShExJParser:
         cls.index_graph(source)
         shapes: List[Node] = sorted(source.subjects(RDF.type, RDFS.Class), key=str)
 
-        all_datatypes: Set[URIRef] = {URIRef(SCHEMA.DataType)}
-        # Use transitive_subjects to find all subclasses of DataType
-        for dt_sub in source.transitive_subjects(RDFS.subClassOf, SCHEMA.DataType):
-            if isinstance(dt_sub, URIRef):
-                all_datatypes.add(dt_sub)
-
-        # Also find all instances of DataType (like schema:Text) and their
-        # subclasses
-        for dt_inst in source.subjects(RDF.type, SCHEMA.DataType):
-            if isinstance(dt_inst, URIRef):
-                all_datatypes.add(dt_inst)
-                for dt_sub in source.transitive_subjects(RDFS.subClassOf, dt_inst):
-                    if isinstance(dt_sub, URIRef):
-                        all_datatypes.add(dt_sub)
+        all_datatypes: Set[URIRef] = collect_datatypes(source)
 
         shex: Dict[str, Any] = {
             "type": "Schema",
@@ -323,19 +340,18 @@ class ShaclParser:
         dest.bind("sh", SHACL)
         dest.bind("schema", SCHEMA)
         dest.bind("", BASE)
+
+        # parse_shape() reads ShExJParser._domain_includes to find a class's
+        # properties, but that cache is only filled by index_graph(). Without
+        # this call the shapes come out with no sh:property constraints at
+        # all, and the resulting "validation" conforms to everything. Do not
+        # remove this on the grounds that generate_files() runs to_shex()
+        # first - that ordering is an accident, not a contract.
+        ShExJParser.index_graph(source)
+
         shapes: List[Node] = sorted(source.subjects(RDF.type, RDFS.Class), key=str)
 
-        all_datatypes: Set[URIRef] = {URIRef(SCHEMA.DataType)}
-        for dt_sub in source.transitive_subjects(RDFS.subClassOf, SCHEMA.DataType):
-            if isinstance(dt_sub, URIRef):
-                all_datatypes.add(dt_sub)
-
-        for dt_inst in source.subjects(RDF.type, SCHEMA.DataType):
-            if isinstance(dt_inst, URIRef):
-                all_datatypes.add(dt_inst)
-                for dt_sub in source.transitive_subjects(RDFS.subClassOf, dt_inst):
-                    if isinstance(dt_sub, URIRef):
-                        all_datatypes.add(dt_sub)
+        all_datatypes: Set[URIRef] = collect_datatypes(source)
 
         for shape in shapes:
             if isinstance(shape, URIRef):
