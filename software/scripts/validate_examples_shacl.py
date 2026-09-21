@@ -7,6 +7,7 @@ This replaces the legacy Ruby validation tests.
 """
 
 import argparse
+import concurrent.futures
 import logging
 import os
 from pathlib import Path
@@ -153,40 +154,43 @@ def validate_examples(examples: list, invalid_only: bool, source_output: bool) -
     log.info(f"Shapes declare {len(engine.target_classes)} target classes")
 
     log.info(f"Validating {len(examples)} examples")
-    eval_results: List[ExampleResult] = []
-    for example in examples:
-        eval_results.append(engine.validate(example))
-
-    count: int = len(eval_results)
+    count: int = 0
     error_count: int = 0
     targeted_count: int = 0
 
-    for result in eval_results:
-        if not invalid_only:
-            log.info(f"Validating example {result.name}")
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        # chunksize: the engine is pickled per chunk, not per example.
+        # Consumed inside the pool context, so results are reported as they
+        # land. Leaving the block waits for every chunk.
+        for result in pool.map(engine.validate, examples, chunksize=16):
+            count += 1
+            if not invalid_only:
+                log.info(f"Validating example {result.name}")
+            elif count % 50 == 0:
+                log.info(f"Validated {count}/{len(examples)} examples")
 
-        if result.targeted:
-            targeted_count += 1
+            if result.targeted:
+                targeted_count += 1
 
-        if result.error is not None:
-            error_count += 1
-            log.error(f"Invalid JSON example {result.name}: {result.error}")
-        elif not result.conforms:
-            error_count += 1
-            log.error(
-                f"Validation failed for example {result.name}:\n{result.report}"
-            )
-        else:
-            continue
-
-        if source_output:
-            source = "\n".join(
-                f"{i:4d}: {line.rstrip()}"
-                for i, line in enumerate(
-                    result.example.getJsonldRaw().splitlines(), start=1
+            if result.error is not None:
+                error_count += 1
+                log.error(f"Invalid JSON example {result.name}: {result.error}")
+            elif not result.conforms:
+                error_count += 1
+                log.error(
+                    f"Validation failed for example {result.name}:\n{result.report}"
                 )
-            )
-            log.info(f"Source:\n{source}")
+            else:
+                continue
+
+            if source_output:
+                source = "\n".join(
+                    f"{i:4d}: {line.rstrip()}"
+                    for i, line in enumerate(
+                        result.example.getJsonldRaw().splitlines(), start=1
+                    )
+                )
+                log.info(f"Source:\n{source}")
 
     log.info(
         f"Done: Processed {count} examples, "
