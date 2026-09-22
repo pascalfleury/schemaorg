@@ -124,6 +124,52 @@ class ExampleValidator:
             )
 
 
+class ValidationStats:
+    """Counts validation outcomes and logs them as they arrive."""
+
+    def __init__(self, total: int, invalid_only: bool, source_output: bool) -> None:
+        self.total = total
+        self.invalid_only = invalid_only
+        self.source_output = source_output
+        self.count: int = 0
+        self.error_count: int = 0
+        self.targeted_count: int = 0
+        log.info(f"Validating {self.total} examples")
+
+    def add(self, result: ExampleResult) -> None:
+        """Record one result and log whatever it warrants."""
+        self.count += 1
+        if not self.invalid_only:
+            log.info(f"Validating example {result.name}")
+
+        if result.targeted:
+            self.targeted_count += 1
+
+        if result.error is not None:
+            self.error_count += 1
+            log.error(f"Invalid JSON example {result.name}: {result.error}")
+        elif not result.conforms:
+            self.error_count += 1
+            log.error(
+                f"Validation failed for example {result.name}:\n{result.report}"
+            )
+
+        if self.source_output:
+            source = "\n".join(
+                f"{i:4d}: {line.rstrip()}"
+                for i, line in enumerate(
+                    result.example.getJsonldRaw().splitlines(), start=1
+                )
+            )
+            log.info(f"Source:\n{source}")
+
+    def done(self) -> None:
+        log.info(
+            f"Done: Processed {self.count} examples, "
+            f"{self.targeted_count} of which matched at least one shape"
+        )
+
+
 def validate_examples(examples: list, invalid_only: bool, source_output: bool) -> None:
     """Validates the provided examples against the generated SHACL shapes."""
     version: str = schema.getVersion()
@@ -153,61 +199,29 @@ def validate_examples(examples: list, invalid_only: bool, source_output: bool) -
     log.info(f"Subclass ontology RDFS-closed: {before} -> {len(ont_graph)} triples")
     log.info(f"Shapes declare {len(engine.target_classes)} target classes")
 
-    log.info(f"Validating {len(examples)} examples")
-    count: int = 0
-    error_count: int = 0
-    targeted_count: int = 0
+    stats = ValidationStats(
+        total=len(examples), invalid_only=invalid_only, source_output=source_output
+    )
 
     with concurrent.futures.ProcessPoolExecutor() as pool:
         # chunksize: the engine is pickled per chunk, not per example.
-        # Consumed inside the pool context, so results are reported as they
-        # land. Leaving the block waits for every chunk.
         for result in pool.map(engine.validate, examples, chunksize=16):
-            count += 1
-            if not invalid_only:
-                log.info(f"Validating example {result.name}")
-            elif count % 50 == 0:
-                log.info(f"Validated {count}/{len(examples)} examples")
+            stats.add(result)
+    stats.done()
 
-            if result.targeted:
-                targeted_count += 1
-
-            if result.error is not None:
-                error_count += 1
-                log.error(f"Invalid JSON example {result.name}: {result.error}")
-            elif not result.conforms:
-                error_count += 1
-                log.error(
-                    f"Validation failed for example {result.name}:\n{result.report}"
-                )
-            else:
-                continue
-
-            if source_output:
-                source = "\n".join(
-                    f"{i:4d}: {line.rstrip()}"
-                    for i, line in enumerate(
-                        result.example.getJsonldRaw().splitlines(), start=1
-                    )
-                )
-                log.info(f"Source:\n{source}")
-
-    log.info(
-        f"Done: Processed {count} examples, "
-        f"{targeted_count} of which matched at least one shape"
-    )
-    if error_count:
-        log.error(f"Found {error_count} invalid examples")
+    if stats.error_count:
+        log.error(f"Found {stats.error_count} invalid examples")
         sys.exit(1)
 
-    if count and not targeted_count:
+    if stats.count and not stats.targeted_count:
         log.error(
-            f"SHACL gate inspected none of the {count} examples: no example "
+            f"SHACL gate inspected none of the {stats.count} examples: no example "
             "declares a type that any shape targets."
         )
         sys.exit(os.EX_CONFIG)
 
     log.info("All examples validated successfully.")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
