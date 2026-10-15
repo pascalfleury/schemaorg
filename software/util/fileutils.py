@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 
 EXTENSIONS_FOR_FORMAT: dict[str, str] = {
@@ -16,10 +18,6 @@ class FileSelector(enum.StrEnum):
 
     ALL = "all"
     CURRENT = "current"
-
-
-FILESET_SELECTORS: frozenset[str] = frozenset(FileSelector)
-FILESET_PROTOCOLS: frozenset[str] = frozenset(("http", "https"))
 
 
 def isAll(selector: str | FileSelector) -> bool:

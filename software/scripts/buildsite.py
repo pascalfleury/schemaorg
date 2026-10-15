@@ -60,7 +60,7 @@ def initialize(args_list: Sequence[str] | None = None) -> argparse.Namespace:
         default=[],
         action="extend",
         nargs="*",
-        help="create files(repeatable) - ALL = all files",
+        help="create the release files (always the complete set; any value such as ALL triggers it)",
     )
     parser.add_argument(
         "-o", "--output", help="output site directory (default: ./software/site)"
@@ -288,11 +288,12 @@ def processDocs(pages: Iterable[str]) -> None:
             buildocspages.buildDocs(pages)
 
 
-def processFiles(files: Iterable[str]) -> None:
-    if any(files):
-        with pretty_logger.BlockLog(logger=log, message="Building supporting files"):
-            loadTerms()
-            buildfiles.buildFiles(files)
+def processFiles() -> None:
+    with pretty_logger.BlockLog(logger=log, message="Building supporting files"):
+        buildfiles.export_files(
+            input_layout=paths.DefaultInputLayout(),
+            output_layout=paths.DefaultOutputLayout(),
+        )
 
 
 def runShaclTests() -> None:
@@ -372,16 +373,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         processDocs(pages=["FullRelease"])
 
         # Generate all vocabulary/schema release files
-        release_files = [
-            "Context",
-            "Owl",
-            "Httpequivs",
-            "Examples",
-            "RDFExports",
-            "CSVExports",
-            "Shex_Shacl",
-        ]
-        processFiles(files=release_files)
+        processFiles()
 
         # Validate the generated release files against shapes
         runShaclTests()
@@ -418,7 +410,8 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         processTerms(terms=schema.config.TERMS)
         processDocs(pages=schema.config.PAGES)
-        processFiles(files=schema.config.FILES)
+        if any(schema.config.FILES):
+            processFiles()
 
         if args.shacltests:
             runShaclTests()
