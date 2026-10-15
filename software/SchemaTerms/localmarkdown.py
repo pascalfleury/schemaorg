@@ -52,7 +52,8 @@ class MarkdownTool:
 
     def wikilinksReplace(self, match: re.Match) -> str:
         t: str = match.group(1)
-        return f'<a class="{self.WCLASS}" href="{self.WPRE}{t}{self.WPOST}">{t}</a>'
+        pre: str = self.WPRE if self.wpre is None else self.wpre
+        return f'<a class="{self.WCLASS}" href="{pre}{t}{self.WPOST}">{t}</a>'
 
     @classmethod
     def setWikilinkCssClass(cls, c: str) -> None:

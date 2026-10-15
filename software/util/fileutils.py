@@ -3,7 +3,7 @@
 
 import enum
 import shutil
-from typing import Callable, Dict, FrozenSet, Iterable, List, Optional, Union
+from typing import Callable, Dict, Iterable, List, Optional, Union
 
 EXTENSIONS_FOR_FORMAT: Dict[str, str] = {
     "xml": "xml",
@@ -24,10 +24,6 @@ class FileSelector(str, enum.Enum):
 
     def __str__(self) -> str:
         return str(self.value)
-
-
-FILESET_SELECTORS: FrozenSet[str] = frozenset(s.value for s in FileSelector)
-FILESET_PROTOCOLS: FrozenSet[str] = frozenset(["http", "https"])
 
 
 def isAll(selector: Union[str, FileSelector]) -> bool:

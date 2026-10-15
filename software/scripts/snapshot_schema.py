@@ -1,39 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Writes the ALL/https turtle snapshot used by test_snapshot.py."""
+
 import logging
-from typing import Optional, Set
+from pathlib import Path
+from typing import Optional, Union
 
 from schemaorg import constants
-import SchemaTerms.sdotermsource as sdotermsource
+from schemaorg.graph_loader import GraphLoader
+from schemaorg.layout import Issues
+from schemaorg.renderers import RdfRenderer
 import scripts.buildfiles as buildfiles
-import util.fileutils as fileutils
-import util.schema as schema
+import util.paths as paths
 
 log: logging.Logger = logging.getLogger(__name__)
 
+SNAPSHOT_FILENAME = "schemaorg-all-https.ttl"
 
-def snapshot_ttl(output_dir: Optional[str] = None) -> None:
-    if output_dir is None:
-        output_dir = str(constants.PROJECT_ROOT / "software/tests/snapshot")
-    # Take some copies of globals we need to manipulate.
-    # TODO: these globals should be arguments or similar
-    outputdir_copy: str = schema.config.OUTPUTDIR
-    selectors_copy: Set[str] = fileutils.FILESET_SELECTORS
-    protocols_copy: Set[str] = fileutils.FILESET_PROTOCOLS
-    schema.config.OUTPUTDIR = ""
-    fileutils.FILESET_SELECTORS = {"all"}
-    fileutils.FILESET_PROTOCOLS = {"https"}
+
+def snapshot_ttl(output_dir: Optional[Union[str, Path]] = None) -> Path:
+    out_dir = Path(output_dir or constants.PROJECT_ROOT / "software/tests/snapshot")
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     log.info("Building snapshot file...")
-    sdotermsource.SdoTermSource.loadSourceGraph("default")
-    buildfiles.exportrdf("RDFExport.turtle", subdirectory_path=output_dir)
-    log.info(f"Snapshot file created in {output_dir}")
-
-    # Put back the original values.
-    schema.config.OUTPUTDIR = outputdir_copy
-    fileutils.FILESET_SELECTORS = selectors_copy
-    fileutils.FILESET_PROTOCOLS = protocols_copy
+    source_graph = GraphLoader().load(
+        Issues(paths.DefaultInputLayout()).get_ttl_files()
+    )
+    all_graph, _ = buildfiles.split_release_graphs(source_graph)
+    path = out_dir / SNAPSHOT_FILENAME
+    path.write_text(RdfRenderer(all_graph).render("turtle"), encoding="utf-8")
+    log.info(f"Snapshot file created in {path}")
+    return path
 
 
 if __name__ == "__main__":

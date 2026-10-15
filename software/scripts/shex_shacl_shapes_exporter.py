@@ -360,27 +360,28 @@ def generate_files(
     term_defs_path: Union[str, Path],
     version: str,
     input_format: str = "nt",
+    releases: Optional[Releases] = None,
 ) -> None:
     term_defs: str = Path(term_defs_path).read_text(encoding="utf-8")
 
     graph: Graph = Graph().parse(data=term_defs, format=input_format)
     graph.bind("schema", SCHEMA)
 
-    releases = Releases(paths.DefaultOutputLayout(), schema.VERSION)
+    rel = releases or Releases(paths.DefaultOutputLayout(), schema.VERSION)
 
-    shexj_path: Path = releases.file(
+    shexj_path: Path = rel.file(
         version, protocol="", scope="shapes", extension=".shexj"
     )
     shexj_path.write_text(ShExJParser.to_shex(graph), encoding="utf-8")
     log.info(f"Created {shexj_path}")
 
-    shacl_path: Path = releases.file(
+    shacl_path: Path = rel.file(
         version, protocol="", scope="shapes", extension=".shacl"
     )
     shacl_path.write_text(ShaclParser.to_shacl(graph), encoding="utf-8")
     log.info(f"Created {shacl_path}")
 
-    subclasses_path: Path = releases.file(
+    subclasses_path: Path = rel.file(
         version, protocol="", scope="subclasses", extension=".shacl"
     )
     subclasses_path.write_text(ShaclParser.get_subclasses(graph), encoding="utf-8")

@@ -1,454 +1,226 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""CLI and orchestrator for generating schema.org release files.
+
+Owns everything that is not rendering: command line, layouts, version, the
+ALL/CURRENT graphs, the vocabulary, and the list of files to produce. A build
+always produces the complete set. Renderers in ``schemaorg.renderers`` only
+ever see a graph or a vocabulary.
+"""
+
 import argparse
-import csv
-import io
-import json
+from functools import partial
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
-from urllib.parse import ParseResult, urlparse
+from typing import Callable, List, Optional, Sequence, Set, Tuple
 
 import rdflib
-from rdflib.compare import to_canonical_graph
-import rdflib.namespace
 from schemaorg import constants
-from schemaorg.layout import Releases
-from schemaorg.sdo_uri import SCHEMA_URL, SDO, SdoUri
-import SchemaExamples.schemaexamples as schemaexamples
-import SchemaTerms.localmarkdown as localmarkdown
-import SchemaTerms.sdoterm as sdoterm
+from schemaorg.graph_loader import GraphLoader
+from schemaorg.layout import (
+    Domain,
+    InputLayout,
+    Issues,
+    OutputLayout,
+    Protocol,
+    Releases,
+    Scope,
+)
+from schemaorg.model import Vocabulary, VocabularyLoader
+from schemaorg.renderers import (
+    Artifact,
+    CountsRenderer,
+    CsvRenderer,
+    ExamplesRenderer,
+    HttpEquivsRenderer,
+    JsonLdRenderer,
+    OwlRenderer,
+    RdfRenderer,
+    ShapesRenderer,
+    SitemapRenderer,
+    protocol_swap,
+    write_artifact,
+)
+from schemaorg.sdo_uri import SDO, SdoUri
+from schemaorg.version import Version, VersionItem
 import SchemaTerms.sdotermsource as sdotermsource
-import scripts.shex_shacl_shapes_exporter as shex_shacl_shapes_exporter
-import util.buildocspages as buildocspages
-import util.fileutils as fileutils
-import util.paths as paths
 import util.pretty_logger as pretty_logger
 import util.schema as schema
-import util.sdojsonldcontext as sdojsonldcontext
-from util.sdoowl import OwlBuild
-from util.sort_dict import sort_dict, sort_xml
-import util.textutils as textutils
 
 log: logging.Logger = logging.getLogger(__name__)
 
 
-def buildTurtleEquivs() -> str:
-    """Build equivalences between http and https versions of schema.org terms."""
-    http_sdo: rdflib.Namespace = rdflib.Namespace(SCHEMA_URL._replace(scheme="http").geturl())
-    outGraph: rdflib.Graph = rdflib.Graph()
-    outGraph.bind("schema_p", http_sdo)
-    outGraph.bind("schema_s", SDO)
-    outGraph.bind("owl", rdflib.namespace.OWL)
-
-    all_terms: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllTerms(expanded=True)
-    for t in all_terms:
-        # getAllTerms() also yields foreign nodes typed with a schema.org class
-        # (e.g. the ELI dataset Organization); only schema.org terms have equivalents.
-        if isinstance(t, sdoterm.SdoTerm) and not t.retired and SdoUri(t.id).is_sdo():
-            eqiv: rdflib.URIRef = rdflib.namespace.OWL.equivalentClass
-            if t.termType == sdoterm.SdoTermType.PROPERTY:
-                eqiv = rdflib.namespace.OWL.equivalentProperty
-
-            p_uri: rdflib.URIRef = http_sdo[t.id]
-            s_uri: rdflib.URIRef = SDO[t.id]
-            outGraph.add((p_uri, eqiv, s_uri))
-            outGraph.add((s_uri, eqiv, p_uri))
-
-    return str(outGraph.serialize(format="turtle", auto_compact=True, sort_keys=True))
+# -- graphs ----------------------------------------------------------------
 
 
-def jsonldcontext(page: str) -> str:
-    return str(sdojsonldcontext.getContext())
+def _bind_namespaces(graph: rdflib.Graph) -> None:
+    graph.bind("schema", constants.SCHEMA_URI)
+    sdotermsource.bindNameSpaces(graph)
 
 
-jsonldtree = buildocspages.jsonldtree
+def split_release_graphs(source_graph: rdflib.Graph) -> Tuple[rdflib.Graph, rdflib.Graph]:
+    """ALL graph (schema.org subjects plus foreign type stubs) and CURRENT graph (no attic)."""
+    all_graph = rdflib.Graph()
+    _bind_namespaces(all_graph)
+    current_graph = rdflib.Graph()
+    _bind_namespaces(current_graph)
+
+    # Keep all SDO statements
+    for s, p, o in source_graph:
+        if isinstance(s, rdflib.URIRef) and SdoUri(s).is_sdo():
+            all_graph.add((s, p, o))
+
+    # Foreign classes and properties referenced by schema.org terms get a bare
+    # type declaration so consumers can resolve them (skipping W3C meta-terms).
+    meta_classes = {rdflib.RDFS.Class, rdflib.OWL.Class, rdflib.RDF.Property}
+    meta_props = {rdflib.RDF.Property, rdflib.OWL.ObjectProperty, rdflib.OWL.DatatypeProperty}
+
+    def is_foreign(o: rdflib.term.Node) -> bool:
+        return isinstance(o, rdflib.URIRef) and not SdoUri(o).is_sdo()
+
+    for pred in (rdflib.RDFS.subClassOf, rdflib.OWL.equivalentClass):
+        for _, o in list(all_graph.subject_objects(pred)):
+            if is_foreign(o) and o not in meta_classes:
+                all_graph.add((o, rdflib.RDF.type, rdflib.RDFS.Class))
+    for pred in (rdflib.RDFS.subPropertyOf, rdflib.OWL.equivalentProperty):
+        for _, o in list(all_graph.subject_objects(pred)):
+            if is_foreign(o) and o not in meta_props:
+                all_graph.add((o, rdflib.RDF.type, rdflib.RDF.Property))
+
+    retired: Set[rdflib.term.Node] = {
+        s for s, o in all_graph.subject_objects(SDO.isPartOf) if SdoUri(o).is_retired()
+    }
+    for s, p, o in all_graph:
+        if s not in retired:
+            current_graph.add((s, p, o))
+
+    return all_graph, current_graph
 
 
-def httpequivs(page: str) -> str:
-    return buildTurtleEquivs()
+# -- plan ------------------------------------------------------------------
 
 
-def owl(page: str) -> str:
-    return str(OwlBuild().getContent())
+# Each (https, http) file pair shares one render; only post-processing differs.
+PROTOCOL_VARIANTS: Tuple[Tuple[Protocol, Tuple[Callable[[str], str], ...]], ...] = (
+    (Protocol.HTTPS, ()),
+    (Protocol.HTTP, (protocol_swap(),)),
+)
 
 
-def sitemap(page: str) -> str:
-    version_date: str = str(schema.VERSION.current().date() or "")
-    def node(t: str) -> str:
-        return f""" <url>
-   <loc>{constants.SCHEMA_URI}{t}</loc>
-   <lastmod>{version_date}</lastmod>
- </url>
-"""
-    STATICPAGES: List[str] = [
-        "docs/schemas.html", "docs/full.html", "docs/gs.html", "docs/about.html",
-        "docs/howwework.html", "docs/releases.html", "docs/faq.html",
-        "docs/datamodel.html", "docs/developers.html", "docs/extension.html",
-        "docs/meddocs.html", "docs/hotels.html",
+def export_scoped(
+    scope: Scope,
+    graph: rdflib.Graph,
+    vocab: Vocabulary,
+    version: VersionItem,
+    releases: Releases,
+) -> List[Artifact]:
+    """RDF and CSV release artifacts for one scope (no file I/O)."""
+    rdf = RdfRenderer(graph)
+    csv = CsvRenderer(vocab)
+    include_retired = scope == Scope.ALL
+    artifacts: List[Artifact] = []
+    for protocol, finisher in PROTOCOL_VARIANTS:
+        def release_file(extension: str) -> Path:
+            return releases.file(protocol=protocol, scope=scope, extension=extension)
+
+        artifacts.extend([
+            Artifact("RDFExport.json-ld", release_file(".jsonld"), partial(rdf.render, "json-ld"), finisher),
+            Artifact("RDFExport.nquads", release_file(".nq"), partial(rdf.render, "nquads", SDO[version.number()]), finisher),
+            Artifact("RDFExport.nt", release_file(".nt"), partial(rdf.render, "nt"), finisher),
+            Artifact("RDFExport.rdf", release_file(".rdf"), partial(rdf.render, "rdf"), finisher),
+            Artifact("RDFExport.turtle", release_file(".ttl"), partial(rdf.render, "turtle"), finisher),
+            Artifact("CSVExports", release_file("-types.csv"), partial(csv.types, include_retired), finisher),
+            Artifact("CSVExports", release_file("-properties.csv"), partial(csv.properties, include_retired), finisher),
+        ])
+    return artifacts
+
+
+def export_unscoped(
+    graph: rdflib.Graph,
+    vocab: Vocabulary,
+    version: VersionItem,
+    releases: Releases,
+    output_layout: OutputLayout,
+    example_files: Sequence[Path],
+) -> List[Artifact]:
+    """Vocabulary-wide docs and release artifacts (no file I/O)."""
+    def docs_file(filename: str) -> Path:
+        return output_layout.file(Domain.DOCS, filename)
+
+    jsonld = JsonLdRenderer(graph, vocab)
+    counts = CountsRenderer(vocab, version)
+    owl = OwlRenderer(graph, version)
+    shapes = ShapesRenderer(graph)
+    return [
+        Artifact("Context", docs_file("jsonldcontext.jsonld"), jsonld.context),
+        Artifact("Context", docs_file("jsonldcontext.json"), jsonld.context),
+        Artifact("Context", docs_file("jsonldcontext.json.txt"), jsonld.context),
+        Artifact("Context", releases.file(filename="schemaorgcontext.jsonld"), jsonld.context),
+        Artifact("Tree", docs_file("tree.jsonld"), jsonld.tree),
+        Artifact("jsoncounts", docs_file("jsoncounts.json"), counts.json),
+        Artifact("jsonpcounts", docs_file("jsonpcounts.js"), counts.jsonp),
+        Artifact("Owl", docs_file("schemaorg.owl"), owl.render),
+        Artifact("Owl", releases.file(filename="schemaorg.owl"), owl.render),
+        Artifact("Httpequivs", releases.file(filename="httpequivs.ttl"), HttpEquivsRenderer(vocab).render),
+        Artifact("Sitemap", docs_file("sitemap.xml"), SitemapRenderer(vocab, version).render),
+        Artifact("Shex_Shacl", releases.file(protocol="", scope="shapes", extension=".shexj"), shapes.shex),
+        Artifact("Shex_Shacl", releases.file(protocol="", scope="shapes", extension=".shacl"), shapes.shacl),
+        Artifact("Shex_Shacl", releases.file(protocol="", scope="subclasses", extension=".shacl"), shapes.subclasses),
+        Artifact("Examples", releases.file(filename="schemaorg-all-examples.txt"), ExamplesRenderer(example_files).render),
     ]
 
-    output: List[str] = ['<?xml version="1.0" encoding="utf-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n']
-    terms: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllTerms(suppressSourceLinks=True)
-    for term in sorted(map(str, terms)):
-        if SdoUri(term).is_sdo():
-            output.append(node(term))
-    for p in STATICPAGES:
-        output.append(node(p))
-    output.append("</urlset>\n")
-    return "".join(output)
+
+# -- orchestration ---------------------------------------------------------
 
 
-def protocolSwap(content: str, protocol: str, altprotocol: str) -> str:
-    extensions: List[str] = ["attic", "auto", "bib", "health-lifesci", "meta", "pending"]
-    ret: str = content
-    for layer in ["core", *extensions]:
-        root: ParseResult = urlparse(str(SdoUri.for_layer(layer)))
-        ret = ret.replace(root._replace(scheme=protocol).geturl(), root._replace(scheme=altprotocol).geturl())
-    return ret
+def export_files(
+    input_layout: InputLayout,
+    output_layout: OutputLayout,
+) -> None:
+    """Loads the source graph, plans, and writes every release artifact."""
+    version = Version(input_layout.file(Domain.ROOT, constants.VERSIONS_FILE))
+    current_version = version.current()
+    releases = Releases(output_layout, version)
+    issues = Issues(input_layout)
 
+    with pretty_logger.BlockLog(message="Loading source graph", logger=log):
+        source_graph = GraphLoader().load(issues.get_ttl_files())
+    with pretty_logger.BlockLog(message="Preparing export graphs", logger=log):
+        all_graph, current_graph = split_release_graphs(source_graph)
+        vocab = VocabularyLoader(all_graph, version=current_version).load()
 
-def protocols() -> Tuple[str, str]:
-    """Return the protocols (http, https) in order of priority."""
-    return ("https", "http") if SCHEMA_URL.scheme == "https" else ("http", "https")
-
-
-ALL_GRAPH: Optional[rdflib.Graph] = None
-CURRENT_GRAPH: Optional[rdflib.Graph] = None
-
-
-def exportrdf(exportType: str, subdirectory_path: Optional[str] = None) -> None:
-    global ALL_GRAPH, CURRENT_GRAPH
-
-    if not ALL_GRAPH:
-        ALL_GRAPH = rdflib.Graph()
-        ALL_GRAPH.bind("schema", SDO)
-        sdotermsource.bindNameSpaces(ALL_GRAPH)
-
-        CURRENT_GRAPH = rdflib.Graph()
-        sdotermsource.bindNameSpaces(CURRENT_GRAPH)
-        CURRENT_GRAPH.bind("schema", SDO)
-
-        ALL_GRAPH += sdotermsource.SdoTermSource.sourceGraph()
-        protocol: str
-        protocol, _ = protocols()
-        sdo_origin: str = SCHEMA_URL._replace(path="").geturl()
-
-        log.debug("Cleanup non schema org things.")
-        ALL_GRAPH.update(
-            f'DELETE {{?s ?p ?o}} WHERE {{ ?s ?p ?o. '
-            f'FILTER (!regex(str(?s), "^{protocol}://([\\\\w-]+\\\\.)?schema\\\\.org")). }}'
-        )
-
-        log.debug("Generate Foreign types – SPARQL INSERT")
-        insert_foreign_types: str = f"""
-        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        PREFIX owl: <http://www.w3.org/2002/07/owl#>
-        INSERT {{ ?classNode a rdfs:Class . ?propNode a rdf:Property . }}
-        WHERE {{
-            {{ {{ ?s rdfs:subClassOf ?classNode }} UNION {{ ?s owl:equivalentClass ?classNode }}
-                FILTER (isURI(?classNode) && ?classNode != rdfs:Class && ?classNode != owl:Class && ?classNode != rdf:Property && !strstarts(str(?classNode), "{sdo_origin}"))
-            }} UNION
-            {{ {{ ?s rdfs:subPropertyOf ?propNode }} UNION {{ ?s owl:equivalentProperty ?propNode }}
-                FILTER (isURI(?propNode) && ?propNode != rdf:Property && ?propNode != owl:ObjectProperty && ?propNode != owl:DatatypeProperty && !strstarts(str(?propNode), "{sdo_origin}"))
-            }}
-        }}"""
-        ALL_GRAPH.update(insert_foreign_types)
-
-        log.debug("Merge")
-        assert CURRENT_GRAPH is not None
-        CURRENT_GRAPH += ALL_GRAPH
-
-        log.debug("Delete items from the attic")
-        CURRENT_GRAPH.update(f'PREFIX schema: <{constants.SCHEMA_URI}> DELETE {{?s ?p ?o}} WHERE{{ ?s ?p ?o; schema:isPartOf <{SdoUri.for_layer("attic")}>. }}')
-
-    formats: List[str] = ["json-ld", "turtle", "nt", "nquads", "rdf"]
-    if exportType == "RDFExports":
-        for fmt in sorted(formats):
-            assert ALL_GRAPH is not None
-            assert CURRENT_GRAPH is not None
-            _exportrdf(fmt, ALL_GRAPH, CURRENT_GRAPH, subdirectory_path)
-    elif (extype := exportType.removeprefix("RDFExport.")) in formats:
-        assert ALL_GRAPH is not None
-        assert CURRENT_GRAPH is not None
-        _exportrdf(extype, ALL_GRAPH, CURRENT_GRAPH, subdirectory_path)
-    else:
-        raise ValueError(f"Unknown export format: {exportType}")
-
-
-
-def get_release_file_path(selector: Union["fileutils.FileSelector", str], protocol: str, output_format: str, suffix: Optional[str] = None, subdirectory_path: Optional[str] = None) -> Path:
-    extension: str = fileutils.EXTENSIONS_FOR_FORMAT[output_format.lower()]
-    parts: List[str] = [str(selector).lower(), protocol.lower()]
-    if suffix:
-        parts.append(suffix)
-    merged: str = "-".join(parts)
-    filename: str = f"schemaorg-{merged}.{extension}"
-
-    output_layout = paths.DefaultOutputLayout()
-    if subdirectory_path is not None:
-        return output_layout.file(
-            paths.Domain.ROOT, f"{subdirectory_path}/{filename}"
-        )
-    else:
-        return Releases(output_layout, schema.VERSION).file(filename=filename)
-
-def _exportrdf(output_format: str, all_graph: rdflib.Graph, current_graph: rdflib.Graph, subdirectory_path: Optional[str] = None) -> None:
-    protocol, altprotocol = protocols()
-    version: str = schema.VERSION.current().number()
-
-    for selector in fileutils.FILESET_SELECTORS:
-        g: rdflib.Graph = all_graph if fileutils.isAll(selector) else current_graph
-        ns_mgr: rdflib.namespace.NamespaceManager = g.namespace_manager
-        g_can: rdflib.Graph = to_canonical_graph(g)
-        g_can.namespace_manager = ns_mgr
-
-        if output_format == "rdf":
-            g_out = rdflib.Graph()
-            g_out.namespace_manager = ns_mgr
-
-            def type_sort_key(trip: Tuple[Any, Any, Any]) -> Tuple[int, str, str]:
-                s, p, o = trip
-                if p == rdflib.RDF.type:
-                    if o == rdflib.RDFS.Class:
-                        return (0, str(s), str(o))
-                    return (1, str(s), str(o))
-                return (2, str(s), str(p))
-
-            for t in sorted(g_can, key=type_sort_key):
-                g_out.add(t)
-            g_can = g_out
-
-        for p in fileutils.FILESET_PROTOCOLS:
-            final_g: Union[rdflib.Graph, rdflib.Dataset] = g_can
-            if output_format == "nquads":
-                ds: rdflib.Dataset = rdflib.Dataset()
-                qg: rdflib.Graph = ds.graph(rdflib.URIRef(f"{SCHEMA_URL._replace(scheme=p).geturl()}{version}"))
-                for trip in g_can:
-                    qg.add(trip)
-                final_g = ds
-
-            fn: str = str(get_release_file_path(
-                selector=selector,
-                protocol=p,
-                output_format=output_format,
-                subdirectory_path=subdirectory_path,
-            ))
-            with pretty_logger.BlockLog(logger=log, message=f"Exporting {fn}"):
-                fmt: str = "pretty-xml" if output_format == "rdf" else output_format
-                out: str = str(final_g.serialize(format=fmt, auto_compact=True, sort_keys=True, max_depth=1))
-
-                if output_format in ("nt", "nquads"):
-                    out = "\n".join(sorted(line.rstrip() for line in out.splitlines() if line.strip())) + "\n"
-                elif output_format == "rdf":
-                    try:
-                        out = sort_xml(out)
-                    except Exception as e:
-                        log.warning(f"Failed to sort RDF XML: {e}")
-                elif output_format == "json-ld":
-                    try:
-                        out = json.dumps(sort_dict(json.loads(out)), indent=2)
-                    except Exception as e:
-                        log.warning(f"Failed to sort JSON-LD: {e}")
-
-                content: str = out
-                if p != protocol:
-                    content = protocolSwap(out, protocol, altprotocol)
-
-                Path(fn).write_text(content, encoding="utf-8")
-
-
-def uriwrap(thing: Any) -> str:
-    """Convert various types into uris. Sorts items if they are a list."""
-    if not thing:
-        return ""
-    if isinstance(thing, str):
-        return str(SdoUri(thing))
-    if isinstance(thing, (sdoterm.SdoTermSequence, sdoterm.SdoTermOrId, sdoterm.SdoTerm)):
-        return uriwrap(getattr(thing, "ids", getattr(thing, "id", None)))
-    try:
-        return textutils.Array2String(sorted(map(uriwrap, thing)))
-    except (TypeError, ValueError) as e:
-        log.fatal(f"Cannot uriwrap {thing}:{e}")
-        return ""
-
-
-def exportcsv(page: str) -> None:
-    protocol: str
-    altprotocol: str
-    protocol, altprotocol = protocols()
-    type_fields: List[str] = ["id", "label", "comment", "subTypeOf", "enumerationtype", "equivalentClass", "properties", "subTypes", "supersedes", "supersededBy", "isPartOf"]
-    prop_fields: List[str] = ["id", "label", "comment", "subPropertyOf", "equivalentProperty", "subproperties", "domainIncludes", "rangeIncludes", "inverseOf", "supersedes", "supersededBy", "isPartOf"]
-
-    typedata: List[Dict[str, str]] = []
-    typedata_all: List[Dict[str, str]] = []
-    propdata: List[Dict[str, str]] = []
-    propdata_all: List[Dict[str, str]] = []
-    terms: Sequence[Union[str, sdoterm.SdoTerm]] = sdotermsource.SdoTermSource.getAllTerms(expanded=True, suppressSourceLinks=True)
-
-    term: Union[str, sdoterm.SdoTerm]
-    for term in terms:
-        if not isinstance(term, sdoterm.SdoTerm) or term.termType == sdoterm.SdoTermType.REFERENCE or not SdoUri(term.id).is_sdo():
-            continue
-
-        row: Dict[str, str] = {
-            "id": term.uri, "label": term.label, "comment": term.comment,
-            "supersedes": uriwrap(term.supersedes), "supersededBy": uriwrap(term.supersededBy),
-            "isPartOf": sdotermsource.uriFromLayer(term.extLayer) if term.extLayer else ""
-        }
-
-        if term.termType == sdoterm.SdoTermType.PROPERTY:
-            row.update({
-                "subPropertyOf": uriwrap(term.supers), "equivalentProperty": uriwrap(term.equivalents.ids),
-                "subproperties": uriwrap(term.subs.ids), "domainIncludes": uriwrap(term.domainIncludes.ids),
-                "rangeIncludes": uriwrap(term.rangeIncludes.ids), "inverseOf": uriwrap(term.inverse.id)
-            })
-            propdata_all.append(row)
-            if not term.retired: propdata.append(row)
-        else:
-            row.update({
-                "subTypeOf": uriwrap(term.supers.ids), "equivalentClass": uriwrap(term.equivalents.ids),
-                "subTypes": uriwrap(term.subs.ids)
-            })
-            if term.termType == sdoterm.SdoTermType.ENUMERATIONVALUE:
-                row["enumerationtype"] = uriwrap(term.enumerationParent.id)
-            else:
-                row["properties"] = uriwrap(term.allproperties.ids)
-            typedata_all.append(row)
-            if not term.retired: typedata.append(row)
-
-    writecsvout("properties", propdata, prop_fields, fileutils.FileSelector.CURRENT, protocol, altprotocol)
-    writecsvout("properties", propdata_all, prop_fields, fileutils.FileSelector.ALL, protocol, altprotocol)
-    writecsvout("types", typedata, type_fields, fileutils.FileSelector.CURRENT, protocol, altprotocol)
-    writecsvout("types", typedata_all, type_fields, fileutils.FileSelector.ALL, protocol, altprotocol)
-
-
-def writecsvout(ftype: str, data: List[Dict[str, str]], fields: List[str], selector: Union[fileutils.FileSelector, str], protocol: str, altprotocol: str) -> None:
-    paths_list: List[str] = [str(get_release_file_path(selector=selector, protocol=p, suffix=ftype, output_format="csv")) for p in (protocol, altprotocol)]
-
-    with pretty_logger.BlockLog(message=f"Preparing files {ftype}: {paths_list[0]} and {paths_list[1]}.", logger=log):
-        csv_data: str
-        with io.StringIO() as buffer:
-            writer: csv.DictWriter = csv.DictWriter(buffer, fieldnames=fields, quoting=csv.QUOTE_ALL, lineterminator="\n")
-            writer.writeheader()
-            writer.writerows(data)
-            csv_data = buffer.getvalue()
-
-        Path(paths_list[0]).write_text(csv_data, encoding="utf-8")
-        Path(paths_list[1]).write_text(protocolSwap(csv_data, protocol, altprotocol), encoding="utf-8")
-
-
-def jsoncounts(page: str) -> str:
-    counts: Dict[str, Any] = sdotermsource.SdoTermSource.termCounts()
-    counts["schemaorgversion"] = schema.VERSION.current().number()
-    return json.dumps(sort_dict(counts))
-
-
-def jsonpcounts(page: str) -> str:
-    return f"\n    COUNTS = '{jsoncounts(page)}';\n\n    insertschemacounts ( COUNTS );\n    "
-
-
-def exportshex_shacl(page: str) -> None:
-    version: str = schema.VERSION.current().number()
-    nt_path: Path = get_release_file_path(
-        selector=fileutils.FileSelector.ALL,
-        protocol="http",
-        output_format="nt"
-    )
-
-    if not nt_path.exists():
-        log.info(f"Generating missing {nt_path} for Shex_Shacl")
-        assert ALL_GRAPH is not None
-        _exportrdf("nt", ALL_GRAPH, CURRENT_GRAPH or ALL_GRAPH)
-
-    shex_shacl_shapes_exporter.generate_files(
-        term_defs_path=nt_path,
-        version=version,
-    )
-
-
-def examples(page: str) -> str:
-    return str(schemaexamples.SchemaExamples.allExamplesSerialised())
-
-
-FILELIST: Dict[str, Tuple[Callable[[str], Any], List[Tuple[Any, ...]]]] = {
-    "Context": (jsonldcontext, [("file", paths.Domain.DOCS, "jsonldcontext.jsonld"), ("file", paths.Domain.DOCS, "jsonldcontext.json"), ("file", paths.Domain.DOCS, "jsonldcontext.json.txt"), ("file", paths.Domain.RELEASE, "schemaorgcontext.jsonld")]),
-    "Tree": (jsonldtree, [("file", paths.Domain.DOCS, "tree.jsonld")]),
-    "jsoncounts": (jsoncounts, [("file", paths.Domain.DOCS, "jsoncounts.json")]),
-    "jsonpcounts": (jsonpcounts, [("file", paths.Domain.DOCS, "jsonpcounts.js")]),
-    "Owl": (owl, [("file", paths.Domain.DOCS, "schemaorg.owl"), ("file", paths.Domain.RELEASE, "schemaorg.owl")]),
-    "Httpequivs": (httpequivs, [("file", paths.Domain.RELEASE, "httpequivs.ttl")]),
-    "Sitemap": (sitemap, [("file", paths.Domain.DOCS, "sitemap.xml")]),
-    "RDFExports": (exportrdf, []),
-    "RDFExport.turtle": (exportrdf, []),
-    "RDFExport.rdf": (exportrdf, []),
-    "RDFExport.nt": (exportrdf, []),
-    "RDFExport.nquads": (exportrdf, []),
-    "RDFExport.json-ld": (exportrdf, []),
-    "Shex_Shacl": (exportshex_shacl, []),
-    "CSVExports": (exportcsv, []),
-    "Examples": (examples, [("file", paths.Domain.RELEASE, "schemaorg-all-examples.txt")]),
-}
-
-
-def buildFiles(files: Iterable[str]) -> None:
-    localmarkdown.MarkdownTool.setWikilinkCssClass("localLink")
-    localmarkdown.MarkdownTool.setWikilinkPrePath(constants.SCHEMA_URI)
-    localmarkdown.MarkdownTool.setWikilinkPostPath("")
-
-    targets: List[str] = sorted(FILELIST.keys()) if any(fileutils.isAll(f) for f in files) else list(files)
-
-    process_files: List[str] = list(dict.fromkeys(targets))
-    seen: Set[str] = set(process_files)
-
-    if "Shex_Shacl" in seen:
-        if "RDFExport.nt" not in seen and "RDFExports" not in seen:
-            process_files.insert(0, "RDFExport.nt")
-
-    if "Shex_Shacl" in seen:
-        process_files.remove("Shex_Shacl")
-        process_files.append("Shex_Shacl")
-
-    if "RDFExports" in seen and "RDFExport.nt" in seen:
-        process_files.remove("RDFExport.nt")
-        process_files.insert(0, "RDFExport.nt")
-
-    for p in process_files:
-        if entry := FILELIST.get(p):
-            func, filenames = entry
-            with pretty_logger.BlockLog(message=f"Preparing file {p}.", logger=log):
-                content: Any = func(p)
-                if content:
-                    output_layout = paths.DefaultOutputLayout()
-                    releases = Releases(output_layout, schema.VERSION)
-                    for _, domain, filename in filenames:
-                        if domain == paths.Domain.RELEASE:
-                            out_path: Path = releases.file(filename=filename)
-                        else:
-                            out_path = output_layout.file(domain, filename)
-                        out_path.write_text(str(content), encoding="utf-8")
-        else:
-            log.warning(f"Unknown files name: {p}")
+    artifacts = [
+        *export_scoped(Scope.ALL, all_graph, vocab, current_version, releases),
+        *export_scoped(Scope.CURRENT, current_graph, vocab, current_version, releases),
+        *export_unscoped(all_graph, vocab, current_version, releases, output_layout, issues.get_example_files()),
+    ]
+    for artifact in artifacts:
+        with pretty_logger.BlockLog(message=f"Exporting {artifact.name}: {artifact.path}", logger=log):
+            write_artifact(artifact)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
     logging.basicConfig(level=logging.INFO)
+
     parser = argparse.ArgumentParser(
-        description="Generate vocabulary/schema release files."
+        description="Generate all vocabulary/schema release files."
     )
     parser.add_argument(
-        "files",
-        nargs="*",
-        default=["ALL"],
-        help=(
-            "Files to generate (default: ALL). Valid options: "
-            f"{', '.join(sorted(FILELIST.keys()))}"
-        ),
+        "--input-dir",
+        type=Path,
+        default=constants.PROJECT_ROOT,
+        help="Root directory of the schema.org input layout.",
     )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path(schema.config.OUTPUTDIR),
+        help="Root directory of the output site layout.",
+    )
+
     args = parser.parse_args(argv)
-    buildFiles(args.files)
+    export_files(InputLayout(args.input_dir), OutputLayout(args.output_dir))
 
 
 if __name__ == "__main__":
