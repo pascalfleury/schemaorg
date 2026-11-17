@@ -1,151 +1,106 @@
-Contents
-========
-- [RELEASING NOTES](#releasing-notes)
-- [PRE-RELEASE STEPS](#pre-release-steps)
-- [DEPLOY RELEASE](#deploy-release)
-- [POST-RELEASE STEPS](#post-release-steps)
-- [GENERAL PRE-Release conditions](#general-pre-release-conditions)
-- [DEPLOY TO SCHEMA.ORG SITE](#deploy-to-schemaorg-site)
+# Releasing a New Version of Schema.org
 
+This guide covers cutting an official numbered Schema.org release (`X.Y`),
+committing its frozen artifacts to GitHub, and deploying it to
+`https://staging.schema.org` and `https://schema.org`. See
+[SOFTWARE_README.md](SOFTWARE_README.md) for local setup and daily development.
 
-RELEASING NOTES
-===============
+> **Permissions:** Cutting and deploying a release requires write access to the
+> `schemaorg/schemaorg` GitHub repository and deployment access to the Google
+> Cloud App Engine projects (`schemaorg-staging` and `schemaorgae`).
 
-See [SOFTWARE_README.md](SOFTWARE_README.md) for commandline scripts. This
-document covers the larger release process.
+## 1. How `next` and Numbered Releases Relate
 
-**Note**:  These instructions assume the user has sufficient permissions for both github functions and Google Cloud Appengine deployments.
+- **`data/releases/next/`** is the unreleased, rolling snapshot checked into VCS
+  and updated on every pull request that modifies schemas, examples, or
+  exporters. It has no release date and does not appear in `versions.json`.
+- **`data/releases/X.Y/`** is a frozen, dated release archive created when
+  cutting version `X.Y`.
+- **`versions.json`** records published numbered releases only (`schemaversion`
+  pointing to the newest `X.Y`, plus `releaseLog` mapping each `"X.Y"` to its
+  `"YYYY-MM-DD"` date). Once recorded, `--version latest` resolves to `X.Y`.
 
+## 2. Pre-Release Checklist & Staging Preview
 
-**Technical pre-conditions for release**
+Before cutting `X.Y`:
 
-Overview
+1. **Governance & freeze:** Steering Group has signed off on the release plan
+   and no blocking disputes remain open in the Community Group.
+2. **Release notes:** `docs/releases.html` documents version `X.Y` (including an
+   HTML `id` matching `X.Y` and no leftover `X.*` placeholders).
+3. **Clean `main` checkout:** `main` is checked out with up-to-date dependencies
+   (`pip install -e software`), and CI is green.
+4. **Candidate preview on staging (optional before cutting `X.Y`):**
+   ```bash
+   ./software/scripts/buildsite.py -a --version next
+   ./software/gcloud/deploy2staging.schema.org.sh
+   ```
+   Inspect `https://staging.schema.org/docs/qa.html` and
+   `https://staging.schema.org/docs/releases.html`.
 
-Code, schema, examples and supporting documentation should be in a stable state.
+## 3. Cut and Commit Release `X.Y`
 
-Pay particular attention to release-specific structures and docs/releases.html
-(e.g. no stray '2.x', '2.*' etc. in hidden markup or tables)
+From the repository root on `main` (or a dedicated release PR branch) with the
+virtual environment activated:
 
-We declare the current version. This should match the number
-chosen in /docs/releases.html (check markup assigns an HTML ID too).
+```bash
+# 1. Record X.Y in versions.json (--date defaults to today if omitted)
+./software/scripts/schemaversion.py --add X.Y --date YYYY-MM-DD
 
-The following steps assume a general healthy freeze (tested / QA as below).
+# 2. Generate all 35 release files in data/releases/X.Y/
+./software/scripts/buildfiles.py --version X.Y
 
-in versions.json:
+# 3. Run unit tests and validate all JSON-LD examples against X.Y's SHACL shapes
+./software/scripts/runtests.py
+./software/scripts/validate_examples_shacl.py --version X.Y
+```
 
-    "schemaversion": "3.9",
-    "releaseLog": {
-.
-.
-        "3.9": "2019-08-01",
-        "3.8": "2019-07-01",
-    }
-becomes
-    "schemaversion": "4.0",
-    "releaseLog": {
-.
-.
-        "4.0": "2019-10-01",
-        "3.9": "2019-08-01",
-        "3.8": "2019-07-01",
-    }
+> **Shortcut:** Steps 2 and 3 can be run together via
+> `./software/scripts/buildsite.py --release --version X.Y`.
 
-... this should have an `YYYY-MM-DD` release date for the current release and all
-previous published releases archived under `data/releases/{version}/*`. Ongoing
-unreleased changes live under `data/releases/next/` and do not appear in
-`versions.json`.
+Commit the release metadata, notes, and generated snapshot, then push / merge to
+`main` and verify GitHub CI passes:
 
+```bash
+git add versions.json docs/releases.html data/releases/X.Y/
+git commit -m "Release X.Y"
+```
 
-e.g.
-    data/releases/30.1/schemaorg-all-https.ttl
-    data/releases/30.1/schemaorg-all-https.nq
-    data/releases/30.1/schemaorg-all-https.jsonld
-    data/releases/30.1/schemaorg-current-https.ttl
-    data/releases/30.1/schemaorgcontext.jsonld
-    data/releases/30.1/schemaorg.owl
-    data/releases/30.1/schemaorg-shapes.shacl
+*(Note: `data/releases/next/` is unaffected by `versions.json` updates.)*
 
-PRE-RELEASE STEPS
-=================
-Before building a release, confirm your Python environment is using the correct versions of Python libraries using the following command:
-`pip install -e software`
+## 4. Build Site and Deploy
 
-In a checked out version of the _main_ branch:
+Once `X.Y` is on `main` and CI is green, build the full static site in
+`software/site/` targeting `latest` (`X.Y`), verify on staging, and deploy to
+production:
 
-* Record the new numbered release and date in `versions.json`:
-  `./software/scripts/schemaversion.py --add X.Y --date YYYY-MM-DD`
-* Build and validate the numbered release schema files under `data/releases/X.Y/`:
-  `./software/scripts/buildsite.py --release --version X.Y`
-  (or `./software/scripts/buildfiles.py --version X.Y` followed by `./software/scripts/runtests.py` and `./software/scripts/validate_examples_shacl.py --version X.Y`).
-* Build the static site targeting the new published release when preparing deployment:
-  `./software/scripts/buildsite.py -a --version latest`
-* Commit `versions.json`, `docs/releases.html`, and `data/releases/X.Y/`, push to GitHub, and verify CI tests pass.
+```bash
+# 1. Build software/site against the newly recorded latest release (X.Y)
+./software/scripts/buildsite.py -a --version latest
 
-DEPLOY RELEASE
-==============
+# 2. Deploy to https://staging.schema.org and review /docs/qa.html
+./software/gcloud/deploy2staging.schema.org.sh
 
-Use command `./software/gcloud/deploy2schema.org.sh`
+# 3. Deploy to https://schema.org
+#    (Pass -m to upload without migrating traffic immediately)
+./software/gcloud/deploy2schema.org.sh
+```
 
-**Note**: Supplying the `-m` option to the `deploy2schema.org.sh` command will disable the step in the deploy process that migrates web traffic to the newly deployed version.  This step can be undertaken manually later via the google cloud appengine console.
+- **App Engine Version ID:** Use the release number with `-` in place of `.`
+  (for example, `30-2` for release `30.2`).
+- **CDN propagation:** Cloud caching can take up to ~10 minutes after traffic
+  migration to serve new CSS/JS and pages consistently; perform a hard refresh
+  after ~10 minutes before final post-deploy checks.
 
-Please use the release version as the Appengine Version ID. Update the `.` to `-` for dot releases.
+## 5. Tag the GitHub Release
 
-**Warning**: Because of Google cloud caching processes it may take several minutes before new versions of _all_ released files are supplied in response to a browser request.  As this includes javascript and css files, initial unusual behavior may be experienced.  It is recommended that a full reload of pages, at least 10 minutes after deployment and migration, is performed before analysing a new release.
+Tag the release commit on `main` using the `vX.Y-release` naming convention and
+push the tag:
 
+```bash
+git tag vX.Y-release
+git push origin vX.Y-release
+```
 
-POST-RELEASE STEPS
-==================
-
-* Tag github version vXX.X-release
-
-`git tag [tagname] [commit code]` 
-
-eg. `git tag v14.0-release 9d691a8` Note capitalisation
-
-Then push
-`git push origin [tag name]`
-
-After push, release should be auto created and be visible on the repo home page (takes a few minutes)
-
-GENERAL PRE-Release conditions
-==============================
-
-1) General preconditions / process and QA for release.
-
-1-a) Steering Group have signed off on changes and release plan,
-and no active and unresolved disputes in the Community Group.
-
-1-b) All code is committed to appropriate release branch at Github (usually
-configured as the current default github branch for /schemaorg/ project).
-
-1-c) All tests pass.
-It is best to test against a fresh checkout to avoid depending on uncommitted
-files. 
-
-To run tests: `./software/scripts/runtests.py`
-
- Example transcript:
-
-  $ git clone https://github.com/schemaorg/schemaorg.git
-  Cloning into 'schemaorg'...
-  ...
-
-  ....
-  $ cd schemaorg/
-  $ ./software/scripts/runtests.py
-  [...]
-
-  Ran 70 tests in 21.168s
-
-  OK (expected failures=3)
-
-1-d) Latest candidate release branch is pushed to the generic unstable upstream site
-(i.e. staging.schema.org).
-
-Use command `./software/gcloud/deploy2staging.schema.org.sh`
-
-1-e) The manual QA page /docs/qa.html has been reviewed to ensure
-representative pages of each type appear to be in a healthy state.
-
-e.g. see http://staging.schema.org/docs/qa.html
-
+Pushing a `v*` tag triggers `.github/workflows/create-release.yml`, which
+automatically publishes the corresponding GitHub Release.

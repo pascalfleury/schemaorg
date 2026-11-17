@@ -76,3 +76,20 @@ JSON:
 </script>
 
 ```
+
+### Updating `next` and Running Checks Before Opening a Pull Request
+
+`data/releases/next/` stores the checked-in, unreleased release artifacts built
+from the current `.ttl` and `*examples.txt` files. Whenever you add or edit
+vocabulary terms or examples, regenerate `data/releases/next/`, run the local
+checks, and include the updated `data/releases/next/` files in your PR (see
+[SOFTWARE_README.md](SOFTWARE_README.md) for environment setup):
+
+```bash
+./software/scripts/buildfiles.py
+./software/scripts/runtests.py
+./software/scripts/validate_examples_shacl.py
+```
+
+CI verifies that running `buildfiles.py` produces zero diff in
+`data/releases/next/`.

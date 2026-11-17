@@ -1,254 +1,166 @@
+# Schema.org Software Guide
 
-Schema.org Software
-===================
+This document explains how to set up a local Schema.org environment, keep the
+checked-in `next` snapshot up to date before sending a pull request, and build
+or serve the website locally.
 
-This document describes the software that underpins Schema.org. Most collaborators will only need to be able to run it.
+- Coding conventions: [CODE_README.md](CODE_README.md)
+- Contributing vocabulary & examples: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Cutting and deploying an official numbered release: [RELEASING.md](RELEASING.md)
+- License: [Apache 2.0](../LICENSE)
 
-Recommendations for the code-base can be found in the [CODE_README](CODE_README.md) file.
+## Setup
 
+The toolchain requires **Python 3.11+** in a POSIX environment (Linux, macOS, or
+WSL2 on Windows). Run all commands from the repository root (`schemaorg/`) with
+your virtual environment activated:
 
-* see https://github.com/schemaorg/schemaorg/blob/master/LICENSE for open-source license info (Apache2)
+```bash
+git clone https://github.com/schemaorg/schemaorg.git
+cd schemaorg
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e software
+```
 
-Software
-========
+To include development linters and test runners (`mypy`, `pytest`):
 
-The site codebase is a simple Python (3.11 or above) application. It is used to create a static image of the Schema.org website to be served locally for testing, or uploading to Google's GCloud for web access.
+```bash
+pip install -e "software[dev]"
+```
 
-This repository only contains the vocabulary definition, and examples files, supporting documentation, and Schema.org specific tests and build scripts.
+If you ever hit `ModuleNotFoundError` after pulling new changes, re-run
+`pip install -e software` inside the active virtual environment.
 
-Working with a local version of Schema.org
-==========================================
+### Script Aliases
 
-Note: The associated configuration scripts are designed to run in a Linux or similar environment, including MacOS.
+Installing `software` registers console aliases equivalent to the scripts under
+`./software/scripts/`:
 
-**_Note:_** [Build notes](#build-notes) for example environment(s) are available at the end of this document
-
-To work on the vocabulary and run locally firstly clone the repository on a local system:
-
-    git clone https://github.com/schemaorg/schemaorg.git
-
-
-**_Note:_** The python application only runs under **_Python 3.11 or above_** which should be preinstalled on the local system.
-
-It is recommended that a Python virtual environment is created to avoid conflicts with other python activities on your system. For further information on how to create virtual environments see: https://docs.python.org/3/library/venv.html
-
-    python3 -m venv .venv
-    source .venv/bin/activate
-
-**Installing the software**
-
-The project is described by `software/pyproject.toml`, which declares both the
-third-party dependencies and the schema.org packages themselves. Install it in
-editable mode so that your local edits take effect immediately:
-
-    pip install -e software
-
-The editable install puts the `software` directory on the Python path, which is
-what allows the scripts to import `schemaorg`, `SchemaTerms`, `SchemaExamples`
-and `util` regardless of where you invoke them from.
-
-To also get the development tooling (`mypy`, `pytest`), install the `dev` extra:
-
-    pip install -e "software[dev]"
-
-All commands and scripts should be run from in the root `schemaorg` directory,
-with the virtual environment activated.
-
-**Script aliases**
-
-The install also creates a set of command aliases in the virtual environment,
-which can be used instead of the script paths:
-
-| Alias             | Equivalent script                     |
+| Alias             | Script                                |
 | ----------------- | ------------------------------------- |
-| `build_site`      | `./software/scripts/buildsite.py`     |
 | `build_schema`    | `./software/scripts/buildfiles.py`    |
+| `build_site`      | `./software/scripts/buildsite.py`     |
 | `build_term_list` | `./software/scripts/buildtermlist.py` |
 | `reorg`           | `./software/scripts/reorg.py`         |
 | `run_tests`       | `./software/scripts/runtests.py`      |
 | `dev_server`      | `./software/scripts/devserv.py`       |
 
-Both forms are equivalent; the script paths are used throughout the rest of this
-document.
+## The `next` Release and Pull Request Workflow
 
-**Module Not Found Errors**
-If when running local scripts you receive an error of this form:
+### What `next` Is
 
-    ModuleNotFoundError: No module named 'module_name'
+`data/releases/next/` is the checked-in, unreleased snapshot of all 35 generated
+schema release artifacts (RDF dumps in Turtle, N-Triples, N-Quads, RDF/XML, and
+JSON-LD; CSV type/property tables; `schemaorgcontext.jsonld`; `schemaorg.owl`;
+`httpequivs.ttl`; ShEx/SHACL shapes; and `schemaorg-all-examples.txt`).
 
-There are three common causes. Either your Python environment is not correctly
-set to 3.11 or above, or your virtual environment is not activated, or the
-install is stale because dependencies or packages have been added or changed.
-To confirm you have the correct modules loaded, run again the command:
+- It continuously reflects the current state of `data/*.ttl`,
+  `data/ext/**/*.ttl`, `*examples.txt`, and the exporter code on `main`.
+- Unlike frozen historical releases (`data/releases/30.1/`, etc.), `next` has no
+  release date and never appears in `versions.json` (which tracks only published
+  `X.Y` releases).
+- Reviewing diffs in `data/releases/next/` on pull requests makes every change
+  to published outputs explicit before merge.
 
-    pip install -e software
+### Required Steps Before Sending a Pull Request
 
-**Initial Build**
-Once a local version of the repository has been cloned, in to an appropriate python environment, initially run the following command:
+Whenever you change `.ttl` schema files, `*examples.txt` files, or exporter
+code, regenerate `data/releases/next/`, run the test suites, and commit any
+resulting changes in `data/releases/next/` as part of your pull request:
 
-    ./software/scripts/buildsite.py -a
+```bash
+# 1. Regenerate all 35 artifacts in data/releases/next/
+./software/scripts/buildfiles.py
 
-This will create a local working copy of the schema.org website (targeting `next` by default) in `software/site`. Dependent on the configuration of your system, this will take between 5-20 minutes. Note, this full build is only needed initially or when significant changes have been made; prior to deploying a published production release, run `./software/scripts/buildsite.py -a --version latest`. See below for details on how to build individual files and pages.
+# 2. Run unit and graph-integrity tests
+./software/scripts/runtests.py
 
-**buildfiles.py (`build_schema`)**
+# 3. Validate all JSON-LD examples against the generated SHACL shapes
+./software/scripts/validate_examples_shacl.py
+```
 
-The checked-in directory `data/releases/next/` always tracks the 35 generated schema release files (RDF dumps, CSV tables, JSON-LD context, OWL, ShEx/SHACL shapes, and examples) corresponding to the current `.ttl` definitions, examples, and exporter code. Whenever you modify schema definitions, examples, or renderers, regenerate `data/releases/next/` before committing:
+> **Shortcut:** `./software/scripts/buildsite.py --release` runs unit tests,
+> regenerates `data/releases/next/`, and runs SHACL validation in one command.
 
-    ./software/scripts/buildfiles.py
+GitHub CI runs `./software/scripts/buildfiles.py` on every pull request and
+fails if `data/releases/next/` has uncommitted diffs or untracked files.
 
-CI verifies that running `buildfiles.py` produces zero diff in `data/releases/next/`.
+## Building and Serving the Website Locally
 
-**buildsite.py (`build_site`)**
+Vocabulary definitions live in `data/*.ttl` and `data/ext/*/*.ttl`; examples
+live in `data/*examples.txt` and `data/ext/*/*examples.txt`.
 
-The `buildsite.py` script creates and manages a local image of the Schema.org website as static HTML pages and `docs/*` supporting files in `software/site` (defaulting to `--version next`; pass `--version latest` or `--version X.Y` to render against a published release). The contents of `software/site` are **not** committed to the repository. The `site` directory image has two main purposes:
-    1) It provides a local work-in-progress representation of the website for local testing and debug (see below) and;
-    2) It provides an image of the website that is used for deployment to GCloud (`deploy2gcloud.sh` stages `data/releases/` automatically during upload).
+`buildsite.py` renders static HTML pages and `docs/*` supporting files into
+`software/site/` (which is git-ignored, never committed). By default it reads
+vocabulary terms from `data/releases/next/`.
 
-Running Locally
-===============
+### Full Site Build
 
-To locally serve as a website, run:
+```bash
+./software/scripts/buildsite.py -a
+```
 
-    ./software/scripts/devserv.py
+To build `software/site/` against the latest published numbered release instead
+of `next`:
 
-This serves `software/site` on `localhost:8080` and maps `/version/<ver>/...` (including `/version/next/...` and `/version/latest/...`) directly to `data/releases/<ver>/...` without copying release archives into `software/site`. Use options `--host` and `--port` to change the bind address.
+```bash
+./software/scripts/buildsite.py -a --version latest
+```
 
-Open a browser, on the same system, to `localhost:8080` to see the locally served site.
+To build the full site while running both unit tests and SHACL validation:
 
+```bash
+./software/scripts/buildsite.py -a -r --shacltests
+```
 
-Testing Locally
-===============
+### Incremental Rebuilds During Development
 
-Locally one can regenerate `data/releases/next/`, run unit tests, and validate all JSON-LD examples against the generated SHACL shapes:
+Because `buildsite.py` reads terms from `data/releases/<version>/schemaorg-all-https.ttl`,
+run `./software/scripts/buildfiles.py` first whenever you edit `.ttl` files:
 
-    ./software/scripts/buildfiles.py
-    ./software/scripts/runtests.py
-    ./software/scripts/validate_examples_shacl.py
+```bash
+./software/scripts/buildfiles.py
+./software/scripts/buildsite.py -t Book sameAs
+```
 
-To also auto-build the full HTML site and run both test suites in one pass:
+Other selective rebuild flags (see `./software/scripts/buildsite.py -h`):
 
-    ./software/scripts/buildsite.py -a -r --shacltests
+- `./software/scripts/buildsite.py -t All` — all term pages.
+- `./software/scripts/buildsite.py -d PendingHome` (or `-d All`) — dynamic docs
+  pages (`docs/pending.home.html`, etc.).
+- `./software/scripts/buildsite.py -f All` — `docs/*` supporting files
+  (`docs/jsonldcontext.jsonld`, `docs/schemaorg.owl`, `docs/tree.jsonld`,
+  `docs/jsoncounts.json`, `docs/sitemap.xml`).
+- `./software/scripts/buildsite.py -s` — copy static `docs/` HTML/CSS/JS assets.
 
+### Serving Locally
 
-Deploying to GCloud
-===================
+```bash
+./software/scripts/devserv.py
+```
 
-Run the command:
+Opens `http://localhost:8080` serving `software/site/` and mapping
+`/version/<ver>/...` (including `/version/next/...` and `/version/latest/...`)
+directly to `data/releases/<ver>/...` (use `--host` and `--port` to override).
+Page rebuilds show up on refresh without restarting `devserv.py`.
 
-    ./software/gcloud/deploy2gcloud.sh
+## Releasing a New Version
 
-This will deploy the local version of the site to an appengine instance.  You will need to supply a valid appengine project name and a version ID (This does not need to be the same as the Schema Version).  Accept the default `other.yaml` yaml file name.
+Cutting an official numbered release (`X.Y`), recording it in `versions.json`,
+and deploying to `staging.schema.org` and `schema.org` are covered step by step
+in [RELEASING.md](RELEASING.md).
 
-Note: There are specific deployment scripts for webschemas.org & schema.org.
+## Deploying a Custom Preview to Google App Engine
 
-For more information about GCloud appengine see: https://cloud.google.com/appengine
+To share a branch preview on your own App Engine project (with Google Cloud SDK
+installed and initialized via `gcloud init`):
 
-Internals
-=========
+```bash
+./software/scripts/buildsite.py -a
+./software/gcloud/deploy2gcloud.sh
+```
 
-Internally, the app uses a simple RDF-like graph data model, and has a parser for
-the Turtle format (`.ttl`) subset that we use to represent schemas.
-
-See also wiki: https://github.com/schemaorg/schemaorg/wiki/Contributing
-
-`versions.json` records published numbered releases (`schemaversion` and `releaseLog`). Ongoing unreleased edits target `data/releases/next/` by default without modifying `versions.json`. When cutting an official numbered release, record it via `./software/scripts/schemaversion.py --add X.Y --date YYYY-MM-DD` and generate `data/releases/X.Y/` via `./software/scripts/buildfiles.py --version X.Y`.
-
-If the published version has changed and you want `software/site` rendered against that published release:
-
-    ./software/scripts/buildsite.py -a --version latest
-
-Vocabulary Definition and Examples Files
-========================================
-
-Definitions of the vocabulary terms are held in `.ttl` files stored either in the `./data` or `./data/ext/*` directories.  The vocabulary produced is the result of combining the contents of all `.ttl` files found in those directories into a single RDF graph.
-
-Files containing the examples used on the term pages are held in files of the pattern `*examples.txt` stored either in the `./data` or `./data/ext/*` directories.
-
-Building Individual Files Documents and Term Pages
-==================================================
-
-During development, it is possible to select individual term pages, dynamic docs pages, static docs pages, or output files (vocabulary definition RDF files, sitemap, jsonldcontext, etc.) for rebuilding in the local `site` directory.
-For details see the output of the command `./software/scripts/buildsite.py -h`.  Examples include:
-
-* `./software/scripts/buildsite.py -t Book sameAs`  Would rebuild the *Book* and *sameAs* term pages.
-* `./software/scripts/buildsite.py -t All`  Would rebuild all term pages.
-* `./software/scripts/buildsite.py -f All` Would rebuild all `docs/*` supporting files (`docs/schemaorg.owl`, `docs/jsonldcontext.jsonld`, `docs/sitemap.xml`, `docs/tree.jsonld`, `docs/jsoncounts.json`).
-* `./software/scripts/buildfiles.py` Rebuilds the 35 schema release files in `data/releases/next/`.
-* `./software/scripts/buildsite.py -s` Would copy any static docs pages, css files etc. into the `site`.
-* `./software/scripts/buildsite.py -d PendingHome` Would rebuild the home page for the pending section (`docs/pending.home.html`).
-* `./software/scripts/buildsite.py -d All` Would rebuild all dynamically created docs files.
-
-Changes to created pages are immediately reflected in the output of the local `./software/scripts/devserv.py` server, without the need for a restart. You may need to do a full refresh of a page to see changes, because of browser caching.
-
-Whenever any changes or additions are made to `.ttl` files, examples files, documents, or other files in `docs/`, reflect them into `software/site` using `buildsite.py`. Because site builds read vocabulary terms from `data/releases/<version>/schemaorg-all-https.ttl` (default `next`), regenerate `data/releases/next/` first after editing `.ttl` files:
-
-    ./software/scripts/buildfiles.py
-    ./software/scripts/buildsite.py -t <Term>
-
-For example-only or wording changes once `data/releases/next/` is up to date, rebuilding just the affected term pages with `./software/scripts/buildsite.py -t <Term>` is sufficient to preview them via `./software/scripts/devserv.py`.
-
-_Note:_ **Remember** to run `./software/scripts/buildsite.py -a --version latest` prior to a production deployment or release (or `./software/scripts/buildsite.py -a` for a `next` preview deployment) so `software/site` reflects all current changes.
-
-Releasing New Production Releases of the Site
-=============================================
-
-Once a new candidate release of the site is established and checked/merged into the `main` github branch, there are some steps that need to be taken to prepare that release for deployment, initially to the https://staging.schema.org preview site, then to the http://schema.org site.  These steps are detailed in the [RELEASING.md](RELEASING.md) file.
-
-# Build Notes
-
-## Build Notes for Ubuntu/Debian - using Google/Amazon Cloud-based Virtual Machines
-Notes for building the schemaorg development environment on Ubuntu / Debian based systems, with specific focus on utilising cloud-based virtual machines provided by the Google Cloud Platform and Amazon Web Services. The Common Steps below may also be of assistance to those wishing to build the environment on other locally hosted systems.
-
-**Google Compute Engine VM Specific Steps**
-
-From Google Cloud Platform Console - https://console.cloud.google.com/
- * Create a project
- * In Compute Engine section - create a VM instance - https://console.cloud.google.com/compute/instances
-   * Select a Debian GNU/Linux Boot disk
- * Create and associate a port 8080 ingress firewall rule associated with VM instance
-   * Hint: Duplicate the settings for the 'default-allow-http' rule except for the port number setting
- * Connect to running instance using SSH
-    * or 3rd party ssh client using private key file provided by Google
-
-**Amazon AWS EC2 Specific Steps**
-
-From Amazon AWS Management Console - https://console.aws.amazon.com
-  * Select EC2 Service
-  * Select Launch Instance
-  * Choose an Ubuntu Machine Image, configure details and launch
-  * In security details for the running instance - Security Group:
-    * Add inbound rule for port: 8080 source: 0.0.0.0/0
-  * Connect to running instance using EC2 Instance Connect
-    * or 3rd party ssh client using private key file provided by AWS
-
-**Common Ubuntu/Debian Steps**
-
-Command line commands:
- * `sudo apt-get update && sudo apt-get upgrade`
- * `sudo apt-get install git python3-pip python3-venv`
- * `git clone https://github.com/schemaorg/schemaorg.git`
- * `cd schemaorg`
- * `python3 -m venv .venv && source .venv/bin/activate`
- * `pip install -e software`
- * `./software/scripts/buildsite.py -a`
-
- To serve local version of Schema.org site for web access:
- * `./software/scripts/devserv.py --port 8080 --host 0.0.0.0`
-
-Site should be accessible via:
-
-  http://{`public ip of Google/AWS instance`}:8080/
-
-**SHACL Tests**
-
-You can use the `--shacltests` flag to the `buildsite.py` script to run the Python SHACL tests against the examples.
-
-
-**To enable deployment to a gcloud appengine instance**
-
-This allows wider sharing of a development version of the site replicating the way a production release is deployed to the preview server at https://staging.schema.org and to http://schema.org.
-* Create or identify previously created Google Cloud Platform User
-  * Download the gcloud SDK - instructions available at: https://cloud.google.com/sdk/docs/install#deb
-  * No need for additional components
-  * run `gcloud init` command - to identify cloud account and default project (default can be overridden at deployment time)
-* `software/gcloud/deploy2gcloud.sh`
+`deploy2gcloud.sh` stages `data/releases/` into the upload directory
+automatically; supply your App Engine project name, a version ID, and accept the
+default `other.yaml` configuration when prompted.
