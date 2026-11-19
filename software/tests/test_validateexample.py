@@ -12,14 +12,11 @@ happened here.
 
 from __future__ import annotations
 
-from functools import partial
 import os
 from pathlib import Path
-import subprocess
 import tempfile
 import textwrap
 import unittest
-from unittest.mock import patch
 
 import rdflib
 from rdflib.namespace import SH
@@ -50,6 +47,9 @@ class ValidateExampleTests(unittest.TestCase):
         '{"@context":"http://schema.org/","@type":"Person",'
         '"name":{"@type":"Person","name":"not a string"}}'
     )
+    shapes: rdflib.Graph
+    ontology: rdflib.Graph
+    engine: validator.ExampleValidator
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -180,10 +180,8 @@ class ValidateExampleTests(unittest.TestCase):
             self.assertIn("SHACL files not found", "\n".join(logs.output))
 
     def testRunShaclTestsFailsWhenShaclMissing(self) -> None:
-        quiet_run = partial(subprocess.run, capture_output=True)
         with (
             tempfile.TemporaryDirectory() as tmp,
-            patch.object(buildsite.subprocess, "run", side_effect=quiet_run),
             self.assertLogs(buildsite.log, level="INFO") as logs,
             self.assertRaises(SystemExit) as cm,
         ):

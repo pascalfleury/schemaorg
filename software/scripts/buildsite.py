@@ -1,47 +1,53 @@
 #!/usr/bin/env python3
-"""Program that builds the whole schema.org website."""
+"""CLI orchestrator that builds the schema.org release files and website."""
 
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 import logging
+import os
 from pathlib import Path
-import shutil
-import subprocess
 import sys
 
-from schemaorg import constants, markdown
-from schemaorg.collaborators import CollaboratorRegistry
-from schemaorg.graph_loader import GraphLoader
+from schemaorg import constants
 from schemaorg.jsonld_slice import TermJsonLdIndex
 from schemaorg.layout import (
+    Domain,
     InputLayout,
     NEXT_VERSION,
     OutputLayout,
     Releases,
     checkDataDirectories,
 )
-from schemaorg.model import Vocabulary, VocabularyLoader
+from schemaorg.progress import LogProgressReporter, NullProgressReporter
+from schemaorg.site_bundle import SiteBundle
+from schemaorg.tasks.export_release_files import ExportReleaseFilesTask
+from schemaorg.tasks.export_site_metadata import ExportSiteMetadataTask
+from schemaorg.tasks.prepare_site_static import PrepareSiteStaticTask
+from schemaorg.tasks.render_docs_pages import RenderDocsPagesTask
+from schemaorg.tasks.render_term_pages import RenderTermPagesTask
+from schemaorg.tasks.run_unit_tests import RunUnitTestsTask
+from schemaorg.tasks.validate_examples import (
+    ShaclConfigError,
+    ValidateExamplesTask,
+)
 from schemaorg.term_view import TermViewCatalog
-from schemaorg.version import VersionItem
-import scripts.buildfiles as buildfiles
-import util.buildocspages as buildocspages
-import util.buildtermpages as buildtermpages
-import util.copystaticdocsplusinsert as copystaticdocsplusinsert
+from schemaorg.version import Version, VersionItem
+from SchemaExamples.schemaexamples import SchemaExamples
 import util.paths as paths
 import util.pretty_logger as pretty_logger
 import util.schema as schema
-import util.stats as stats
 
 log: logging.Logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-args: argparse.Namespace
+args: argparse.Namespace = argparse.Namespace(
+    clearfirst=False, autobuild=False
+)
 
 
-def initialize(args_list: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse CLI flags and initialize build configuration."""
+def _parse_args(args_list: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "-a",
@@ -72,7 +78,9 @@ def initialize(args_list: Sequence[str] | None = None) -> argparse.Namespace:
         help="create the release files (always the complete set; any value such as ALL triggers it)",
     )
     parser.add_argument(
-        "-o", "--output", help="output site directory (default: ./software/site)"
+        "-o",
+        "--output",
+        help="output site directory (default: ./software/site)",
     )
     parser.add_argument(
         "-r",
@@ -128,215 +136,129 @@ def initialize(args_list: Sequence[str] | None = None) -> argparse.Namespace:
         default=NEXT_VERSION,
         help="Target release version ('next', 'latest', or declared X.Y)",
     )
-
-    parsed_args = parser.parse_args(args_list)
-
-    # Copy lists so overriding schema.config.* below leaves parsed_args intact.
-    schema.config.BUILDOPTS = list(parsed_args.buildoption)
-    schema.config.TERMS = list(parsed_args.terms)
-    schema.config.PAGES = list(parsed_args.docspages)
-    schema.config.FILES = list(parsed_args.files)
-    schema.config.TARGET_VERSION = parsed_args.version
-
-    if parsed_args.output:
-        schema.config.OUTPUTDIR = parsed_args.output
-
-    if (
-        parsed_args.autobuild
-        or parsed_args.release
-        or parsed_args.shacltests
-        or parsed_args.buildrelease
-    ):
-        schema.config.TERMS = ["ALL"]
-        schema.config.PAGES = ["ALL"]
-        schema.config.FILES = ["ALL"]
-
-    markdown.Markdown.setWikilinkCssClass("localLink")
-    markdown.Markdown.setWikilinkPrePath("/")
-    markdown.Markdown.setWikilinkPostPath("")
-
-    pretty_logger.MakeRootLogPretty()
-
-    return parsed_args
+    return parser.parse_args(args_list)
 
 
-def clear() -> None:
-    if args.clearfirst or args.autobuild:
-        output_dir = Path(schema.config.OUTPUTDIR)
-        log.info("Clearing %s directory", output_dir)
-        if output_dir.is_dir():
-            for item in output_dir.iterdir():
-                if item.name == ".gitkeep":
-                    continue
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
-                    item.unlink()
-
-
-def runtests() -> None:
-    if args.runtests or args.autobuild:
-        with pretty_logger.BlockLog(
-            logger=log, message="Running test scripts before proceeding…"
-        ):
-            cmd = [
-                sys.executable,
-                str(constants.PROJECT_ROOT / "software/scripts/runtests.py"),
-            ]
-            status = subprocess.run(cmd, check=False).returncode
-            if status:
-                log.error("Errors returned: %d", status)
-                sys.exit(status)
-
-
-def initdir(output_dir_str: str) -> None:
-    log.info('Building site in "%s" directory', output_dir_str)
-    clear()
-
+def initdir(output_dir_str: str | Path) -> None:
+    """Compatibility wrapper preparing static docs and GCloud config."""
     input_layout = paths.DefaultInputLayout()
-    output_layout = paths.DefaultOutputLayout()
-    output_layout.dir(paths.Domain.EMPTY)
-
-    with pretty_logger.BlockLog(logger=log, message="Copying docs static files"):
-        copystaticdocsplusinsert.copyFiles(
-            str(input_layout.dir(paths.Domain.DOCS)),
-            str(output_layout.dir(paths.Domain.DOCS)),
-        )
-
-    with pretty_logger.BlockLog(
-        logger=log, message="Preparing GCloud files"
-    ) as block:
-        gdir = output_layout.dir(paths.Domain.GCLOUD)
-        gcloud_files = input_layout.files(paths.Domain.GCLOUD, "*.yaml")
-        for path in gcloud_files:
-            shutil.copy(path, gdir)
-        block.append(f"copied {len(gcloud_files)} files")
-
-    version = schema.VERSION.current().number()
-    message = (
-        f"Creating {schema.constants.HANDLER_FILE} from "
-        f"{schema.constants.HANDLER_TEMPLATE} for version: {version}"
-    )
-    with pretty_logger.BlockLog(logger=log, message=message):
-        template_file = input_layout.file(
-            paths.Domain.GCLOUD, schema.constants.HANDLER_TEMPLATE
-        )
-        template_data = template_file.read_text(encoding="utf-8")
-        handler_data = template_data.replace("{{ver}}", version)
-        output_layout.file(
-            paths.Domain.GCLOUD, schema.constants.HANDLER_FILE
-        ).write_text(handler_data, encoding="utf-8")
+    output_layout = OutputLayout(Path(output_dir_str))
+    PrepareSiteStaticTask(
+        input_layout=input_layout,
+        output_layout=output_layout,
+        target_version=schema.target_version(),
+        current_version=schema.VERSION.current(),
+        clear_first=bool(args.clearfirst or args.autobuild),
+        progress=LogProgressReporter(logger=log, log_steps=False),
+    ).run()
 
 
 def load_site_bundle(
     input_layout: InputLayout | None = None,
     target: VersionItem | None = None,
 ) -> tuple[TermViewCatalog, TermJsonLdIndex, Path]:
-    """Load Vocabulary, Collaborators, and JSON-LD slice index once from Releases."""
+    """Compatibility wrapper returning (catalog, jsonld_index, release_file)."""
     layout = input_layout or paths.DefaultInputLayout()
     resolved = target or schema.target_version()
-    releases = Releases(layout, schema.VERSION)
-    release_file = releases.file(resolved)
-    if not release_file.exists():
-        raise FileNotFoundError(
-            f"Release file not found: {release_file}. "
-            "Please run --buildrelease first."
+    bundle = SiteBundle.from_release(
+        input_layout=layout,
+        releases_layout=layout,
+        target_version=resolved,
+        progress=NullProgressReporter(),
+    )
+    return bundle.catalog, bundle.jsonld_index, bundle.release_file
+
+
+def _run_unit_tests(tests_dir: Path, progress: LogProgressReporter) -> None:
+    summary = RunUnitTestsTask(
+        tests_dir=tests_dir,
+        skip_basics=False,
+        progress=progress,
+    ).run()
+    if not summary.ok:
+        failures = (
+            summary.failure_count
+            + summary.error_count
+            + summary.unexpected_success_count
         )
-    release_jsonld = releases.file(resolved, extension=".jsonld")
-
-    with pretty_logger.BlockLog(
-        logger=log,
-        message=f"Loading vocabulary from release {release_file}",
-        timing=True,
-    ):
-        graph = GraphLoader.load([release_file])
-        vocab = VocabularyLoader(graph, version=resolved).load()
-        collaborators = CollaboratorRegistry.from_layout(layout, vocab)
-        catalog = TermViewCatalog.from_graph(graph, vocab, collaborators)
-        jsonld_index = TermJsonLdIndex.from_graph(
-            graph, jsonld_file=release_jsonld
-        )
-    return catalog, jsonld_index, release_file
+        log.error("Unit tests failed (%d errors/failures)", failures)
+        sys.exit(1)
 
 
-def processTerms(
-    terms: Iterable[str],
-    catalog: TermViewCatalog,
-    jsonld_index: TermJsonLdIndex,
-    release_file: Path,
+def _run_shacl_validation(
+    input_layout: InputLayout,
+    releases_layout: InputLayout | OutputLayout,
+    version_registry: Version,
+    target_version: VersionItem,
+    examples: SchemaExamples | None,
+    progress: LogProgressReporter,
 ) -> None:
-    if any(terms):
-        with pretty_logger.BlockLog(
-            logger=log, message="Building term definition pages", timing=True
-        ):
-            config = {
-                "stats_providers": stats.get_stats_providers(),
-                "build_opts": schema.config.BUILDOPTS,
-                "term_docs_dir": schema.constants.TERMDOCSDIR,
-                "target_version": schema.config.TARGET_VERSION,
-                "output_dir": schema.config.OUTPUTDIR,
-                "release_file": str(release_file),
-            }
-            buildtermpages.buildTerms(
-                terms,
-                config=config,
-                catalog=catalog,
-                jsonld_index=jsonld_index,
-            )
+    loaded_examples = examples or SchemaExamples.from_layout(input_layout)
+    jsonld_examples = [
+        ex for ex in loaded_examples.allExamples() if ex.hasJsonld()
+    ]
+    releases = Releases(releases_layout, version_registry)
+    try:
+        summary = ValidateExamplesTask(
+            releases=releases,
+            version=target_version,
+            examples=jsonld_examples,
+            invalid_only=True,
+            source_output=False,
+            progress=progress,
+        ).run()
+    except ShaclConfigError as exc:
+        log.error("SHACL validation reported errors: %s", exc)
+        sys.exit(os.EX_CONFIG)
 
-
-def processDocs(pages: Iterable[str], catalog: TermViewCatalog) -> None:
-    if any(pages):
-        with pretty_logger.BlockLog(
-            logger=log,
-            message="Building dynamic documentation pages",
-            timing=True,
-        ):
-            buildocspages.buildDocs(pages, catalog=catalog)
-
-
-def processFiles(vocab: Vocabulary | None = None) -> None:
-    with pretty_logger.BlockLog(logger=log, message="Building supporting files"):
-        buildfiles.export_site_docs(
-            input_layout=paths.DefaultInputLayout(),
-            output_layout=paths.DefaultOutputLayout(),
-            version=schema.target_version(),
-            vocab=vocab,
+    if summary.error_count:
+        log.error(
+            "SHACL validation reported errors (%d invalid examples). Failing build.",
+            summary.error_count,
         )
+        sys.exit(1)
 
 
 def runShaclTests(releases_output_dir: str | Path | None = None) -> None:
-    """Run the SHACL validation tests on the generated examples."""
-    with pretty_logger.BlockLog(
-        logger=log, message="Running SHACL validation tests"
-    ):
-        cmd = [
-            sys.executable,
-            str(
-                constants.PROJECT_ROOT
-                / "software/scripts/validate_examples_shacl.py"
-            ),
-            "--version",
-            schema.target_version().number(),
-        ]
-        if releases_output_dir is not None:
-            cmd.extend(["-o", str(releases_output_dir)])
-        status = subprocess.run(cmd, check=False).returncode
-        if status:
-            log.error(
-                "SHACL validation reported errors (exit code %d). Failing build.",
-                status,
-            )
-            sys.exit(status)
+    """Compatibility wrapper running SHACL example validation in-process."""
+    input_layout = paths.DefaultInputLayout()
+    releases_layout: InputLayout | OutputLayout = (
+        OutputLayout(Path(releases_output_dir))
+        if releases_output_dir is not None
+        else input_layout
+    )
+    _run_shacl_validation(
+        input_layout=input_layout,
+        releases_layout=releases_layout,
+        version_registry=schema.VERSION,
+        target_version=schema.target_version(),
+        examples=None,
+        progress=LogProgressReporter(logger=log, log_steps=False),
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     global args
-    args = initialize(argv)
-
+    pretty_logger.MakeRootLogPretty()
+    args = _parse_args(argv)
     checkDataDirectories()
 
-    target = schema.target_version()
+    input_layout = InputLayout(constants.PROJECT_ROOT)
+    version_registry = Version(
+        input_layout.file(Domain.ROOT, constants.VERSIONS_FILE)
+    )
+    target = version_registry.resolve(args.version)
+    tests_dir = constants.PROJECT_ROOT / "software/tests"
+    progress = LogProgressReporter(logger=log, log_steps=False)
+
+    build_all = bool(
+        args.autobuild or args.release or args.shacltests or args.buildrelease
+    )
+    term_ids = ("ALL",) if build_all else tuple(args.terms)
+    page_names = ("ALL",) if build_all else tuple(args.docspages)
+    want_files = bool(build_all or args.files or args.buildsite)
+    build_opts = tuple(args.buildoption)
+
     log.info(
         "Version: %s Released: %s",
         target.number(),
@@ -346,72 +268,121 @@ def main(argv: Sequence[str] | None = None) -> None:
     tests_ran = False
     shacl_ran = False
 
-    # STAGE 1: Build Release
     if args.buildrelease or args.release:
         log.info("=== STAGE 1: BUILDING RELEASE VERSION ===")
-        runtests()
-        tests_ran = True
+        if args.runtests or args.autobuild:
+            _run_unit_tests(tests_dir, progress)
+            tests_ran = True
 
-        with pretty_logger.BlockLog(
-            logger=log, message="Building release files"
-        ):
-            buildfiles.export_release_files(
-                input_layout=paths.DefaultInputLayout(),
-                output_layout=OutputLayout(constants.PROJECT_ROOT / "data"),
-                version=target,
-            )
+        releases_out = OutputLayout(input_layout.dir(Domain.DATA))
+        ExportReleaseFilesTask(
+            input_layout=input_layout,
+            output_layout=releases_out,
+            version=target,
+            progress=progress,
+        ).run()
 
-        runShaclTests()
+        _run_shacl_validation(
+            input_layout=input_layout,
+            releases_layout=releases_out,
+            version_registry=version_registry,
+            target_version=target,
+            examples=None,
+            progress=progress,
+        )
         shacl_ran = True
-
         log.info("=== STAGE 1: RELEASE BUILD COMPLETED SUCCESSFULLY ===")
 
-    # STAGE 2: Build Site
-    build_site_requested = (
+    build_site_requested = bool(
         args.buildsite
         or args.autobuild
         or args.static
-        or bool(args.files)
-        or bool(args.docspages)
-        or bool(args.terms)
+        or args.files
+        or args.docspages
+        or args.terms
     )
     if build_site_requested:
         log.info("=== STAGE 2: BUILDING SITE ===")
-        catalog, jsonld_index, release_file = load_site_bundle(target=target)
-        schema.config.OUTPUTDIR = args.output or str(
-            constants.PROJECT_ROOT / "software/site"
+        bundle = SiteBundle.from_release(
+            input_layout=input_layout,
+            releases_layout=input_layout,
+            target_version=target,
+            progress=progress,
         )
+        site_dir = (
+            Path(args.output)
+            if args.output
+            else constants.PROJECT_ROOT / "software/site"
+        )
+        site_output = OutputLayout(site_dir)
+        log.info('Building site in "%s" directory', site_dir)
 
-        initdir(output_dir_str=schema.config.OUTPUTDIR)
-        if not tests_ran:
-            runtests()
+        PrepareSiteStaticTask(
+            input_layout=input_layout,
+            output_layout=site_output,
+            target_version=target,
+            current_version=bundle.current_version,
+            clear_first=bool(args.clearfirst or args.autobuild),
+            progress=progress,
+        ).run()
+
+        if (args.runtests or args.autobuild) and not tests_ran:
+            _run_unit_tests(tests_dir, progress)
             tests_ran = True
 
-        processTerms(
-            terms=schema.config.TERMS,
-            catalog=catalog,
-            jsonld_index=jsonld_index,
-            release_file=release_file,
-        )
-        processDocs(pages=schema.config.PAGES, catalog=catalog)
-        if any(schema.config.FILES) or args.buildsite:
-            processFiles(vocab=catalog.vocab)
+        RenderTermPagesTask(
+            bundle=bundle,
+            output_layout=site_output,
+            build_opts=build_opts,
+            term_ids=term_ids,
+            progress=progress,
+        ).run()
+
+        RenderDocsPagesTask(
+            bundle=bundle,
+            output_layout=site_output,
+            build_opts=build_opts,
+            page_names=page_names,
+            progress=progress,
+        ).run()
+
+        if want_files:
+            ExportSiteMetadataTask(
+                input_layout=input_layout,
+                output_layout=site_output,
+                version=target,
+                vocab=bundle.vocab,
+                progress=progress,
+            ).run()
 
         if args.shacltests and not shacl_ran:
-            runShaclTests()
+            _run_shacl_validation(
+                input_layout=input_layout,
+                releases_layout=input_layout,
+                version_registry=version_registry,
+                target_version=target,
+                examples=bundle.examples,
+                progress=progress,
+            )
             shacl_ran = True
 
         log.info("=== STAGE 2: SITE BUILD COMPLETED SUCCESSFULLY ===")
 
-    # Global Testing Trigger
     if (args.runtests or args.shacltests) and not (
         build_site_requested or args.buildrelease or args.release
     ):
         log.info("=== RUNNING SCRIBED TEST SUITES ===")
-        if not tests_ran:
-            runtests()
+        if args.runtests and not tests_ran:
+            _run_unit_tests(tests_dir, progress)
         if args.shacltests and not shacl_ran:
-            runShaclTests()
+            _run_shacl_validation(
+                input_layout=input_layout,
+                releases_layout=input_layout,
+                version_registry=version_registry,
+                target_version=target,
+                examples=None,
+                progress=progress,
+            )
 
 
 if __name__ == "__main__":
