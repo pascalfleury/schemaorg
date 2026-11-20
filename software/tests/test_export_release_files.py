@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from schemaorg.executor import ProcessTaskExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout
 from schemaorg.progress import LogProgressReporter
 from schemaorg.tasks.export_release_files import ExportReleaseFilesTask
@@ -60,6 +61,7 @@ class TestExportReleaseFilesTask(unittest.TestCase):
                 output_layout=OutputLayout(self.out_dir / "data"),
                 version=self.version.next(),
                 progress=reporter,
+                executor=ProcessTaskExecutor(max_workers=2),
             ).run()
 
         self.assertEqual(len(written), 35)

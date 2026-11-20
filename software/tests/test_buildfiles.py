@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import rdflib
 from schemaorg import markdown
+from schemaorg.executor import SequentialExecutor
 from schemaorg.graph_loader import split_release_graphs
 from schemaorg.layout import Domain, InputLayout, OutputLayout, Releases, Scope
 from schemaorg.model import SDO, VocabularyLoader
@@ -230,6 +231,7 @@ class TestRenderers(unittest.TestCase):
                     output_layout=out_layout,
                     version=version_obj.next(),
                     progress=NullProgressReporter(),
+                    executor=SequentialExecutor(),
                 ).run()
                 rel_dir = Releases(out_layout, version_obj).dir("next")
                 outputs[label] = {
@@ -469,6 +471,7 @@ class TestPlan(unittest.TestCase):
                 output_layout=release_out_layout,
                 version=version_obj.next(),
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             ).run()
 
             self.assertFalse((in_dir / "data" / "docs").exists())
@@ -517,6 +520,7 @@ class TestPlan(unittest.TestCase):
                 version=version_obj.next(),
                 vocab=bundle.vocab,
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             ).run()
             for name in (
                 "jsoncounts.json",
@@ -546,6 +550,7 @@ class TestPlan(unittest.TestCase):
                 output_layout=release_out_layout,
                 version=version_obj.resolve("30.1"),
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             ).run()
             self.assertTrue(
                 releases.file("30.1", filename="schemaorg.owl").is_file()
@@ -579,6 +584,7 @@ class TestPlan(unittest.TestCase):
                 output_layout=release_out_layout,
                 version=version_obj.next(),
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             ).run()
 
             self.assertEqual(markdown.MarkdownTool.WPRE, "/")

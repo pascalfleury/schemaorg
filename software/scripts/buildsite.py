@@ -225,6 +225,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             output_layout=releases_out,
             version=target,
             progress=progress,
+            executor=ProcessTaskExecutor(default_worker_count()),
         ).run()
 
         _run_shacl_validation(
@@ -298,6 +299,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 version=target,
                 vocab=bundle.vocab,
                 progress=progress,
+                executor=ProcessTaskExecutor(default_worker_count()),
             ).run()
 
         if args.shacltests and not shacl_ran:

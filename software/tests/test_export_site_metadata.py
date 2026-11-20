@@ -8,6 +8,7 @@ import unittest
 
 import rdflib
 
+from schemaorg.executor import ProcessTaskExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout, Releases
 from schemaorg.model import VocabularyLoader
 from schemaorg.progress import LogProgressReporter
@@ -66,6 +67,7 @@ class TestExportSiteMetadataTask(unittest.TestCase):
                 version=self.version.next(),
                 vocab=self.vocab,
                 progress=reporter,
+                executor=ProcessTaskExecutor(max_workers=2),
             ).run()
 
         self.assertEqual(len(written), 8)

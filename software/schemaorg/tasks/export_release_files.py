@@ -11,6 +11,7 @@ from pathlib import Path
 import rdflib
 
 from schemaorg import constants
+from schemaorg.executor import TaskExecutor
 from schemaorg.graph_loader import GraphLoader, split_release_graphs
 from schemaorg.layout import (
     Domain,
@@ -22,7 +23,7 @@ from schemaorg.layout import (
     Scope,
 )
 from schemaorg.model import Vocabulary, VocabularyLoader
-from schemaorg.progress import ProgressReporter
+from schemaorg.progress import ProgressReporter, TaskProgress
 from schemaorg.renderers import (
     CsvRenderer,
     OwlRenderer,
@@ -53,6 +54,33 @@ def write_artifact(artifact: Artifact) -> None:
     for step in artifact.post:
         content = step(content)
     artifact.path.write_text(content, encoding="utf-8")
+
+
+def write_artifacts(
+    artifacts: Sequence[Artifact],
+    executor: TaskExecutor,
+    progress: TaskProgress,
+) -> list[Path]:
+    """Write artifacts grouped by shared render closure via executor."""
+    by_render: dict[int, list[Artifact]] = {}
+    for artifact in artifacts:
+        artifact.path.parent.mkdir(parents=True, exist_ok=True)
+        by_render.setdefault(id(artifact.render), []).append(artifact)
+    groups = list(by_render.values())
+
+    def _write_group(group: list[Artifact]) -> list[tuple[str, str]]:
+        done: list[tuple[str, str]] = []
+        for artifact in group:
+            write_artifact(artifact)
+            done.append((artifact.name, artifact.path.name))
+        return done
+
+    for finished in executor.map(_write_group, groups):
+        for name, filename in finished:
+            progress.step(f"{name} ({filename})")
+            progress.advance(1)
+
+    return [a.path for a in artifacts]
 
 
 # Each (https, http) file pair shares one render; only post-processing differs.
@@ -199,11 +227,13 @@ class ExportReleaseFilesTask:
         output_layout: OutputLayout,
         version: VersionItem,
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         self.input_layout: InputLayout = input_layout
         self.output_layout: OutputLayout = output_layout
         self.version: VersionItem = version
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def run(self) -> list[Path]:
         version_obj = Version(
@@ -247,9 +277,6 @@ class ExportReleaseFilesTask:
                     if existing.is_file() and existing not in expected_paths:
                         existing.unlink()
 
-            for artifact in artifacts:
-                p.step(f"{artifact.name} ({artifact.path.name})")
-                write_artifact(artifact)
-                p.advance(1)
+            written = write_artifacts(artifacts, self.executor, p)
 
-        return [a.path for a in artifacts]
+        return written

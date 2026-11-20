@@ -7,6 +7,7 @@ from functools import partial
 from pathlib import Path
 
 from schemaorg import constants
+from schemaorg.executor import TaskExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout, Releases
 from schemaorg.model import Vocabulary
 from schemaorg.progress import ProgressReporter
@@ -15,7 +16,7 @@ from schemaorg.renderers import (
     render_jsonld_tree,
     render_sitemap,
 )
-from schemaorg.tasks.export_release_files import Artifact, write_artifact
+from schemaorg.tasks.export_release_files import Artifact, write_artifacts
 from schemaorg.version import Version, VersionItem
 
 
@@ -73,12 +74,14 @@ class ExportSiteMetadataTask:
         version: VersionItem,
         vocab: Vocabulary,
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         self.input_layout: InputLayout = input_layout
         self.output_layout: OutputLayout = output_layout
         self.version: VersionItem = version
         self.vocab: Vocabulary = vocab
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def run(self) -> list[Path]:
         version_obj = Version(
@@ -94,9 +97,6 @@ class ExportSiteMetadataTask:
             total=len(artifacts),
             unit="files",
         ) as p:
-            for artifact in artifacts:
-                p.step(f"{artifact.name} ({artifact.path.name})")
-                write_artifact(artifact)
-                p.advance(1)
+            written = write_artifacts(artifacts, self.executor, p)
 
-        return [a.path for a in artifacts]
+        return written

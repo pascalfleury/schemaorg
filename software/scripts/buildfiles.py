@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 from schemaorg import constants
+from schemaorg.executor import ProcessTaskExecutor, default_worker_count
 from schemaorg.layout import Domain, InputLayout, NEXT_VERSION, OutputLayout
 from schemaorg.progress import LogProgressReporter
 from schemaorg.tasks.export_release_files import ExportReleaseFilesTask
@@ -51,6 +52,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         output_layout=OutputLayout(args.output_dir),
         version=version_registry.resolve(args.version),
         progress=LogProgressReporter(logger=log, log_steps=True),
+        executor=ProcessTaskExecutor(default_worker_count()),
     ).run()
 
 
