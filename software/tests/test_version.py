@@ -70,8 +70,9 @@ class TestVersion(unittest.TestCase):
         self.assertTrue(curr.number())
         self.assertFalse(curr.is_next())
         self.assertEqual(str(curr), curr.number())
-        assert curr.date() is not None
-        datetime.strptime(curr.date(), "%Y-%m-%d")
+        curr_date = curr.date()
+        assert curr_date is not None
+        datetime.strptime(curr_date, "%Y-%m-%d")
 
     def test_versions(self) -> None:
         """Every entry in the shipped versions.json parses."""
@@ -82,8 +83,9 @@ class TestVersion(unittest.TestCase):
         for item in all_vers:
             self.assertIsInstance(item.number(), str)
             self.assertTrue(item.number())
-            assert item.date() is not None
-            datetime.strptime(item.date(), "%Y-%m-%d")
+            item_date = item.date()
+            assert item_date is not None
+            datetime.strptime(item_date, "%Y-%m-%d")
 
     def test_version_item(self) -> None:
         item = VersionItem("30.0", "2026-03-19")
@@ -91,6 +93,9 @@ class TestVersion(unittest.TestCase):
         self.assertEqual(item.date(), "2026-03-19")
         self.assertFalse(item.is_next())
         self.assertEqual(str(item), "30.0")
+        self.assertEqual(item.next_minor(), "30.1")
+        self.assertEqual(item.next_major(), "31.0")
+        self.assertEqual(VersionItem("30.1", "2026-09-16").next_minor(), "30.2")
 
     def test_next_version_item(self) -> None:
         item = VersionItem(NEXT_VERSION)
@@ -98,6 +103,10 @@ class TestVersion(unittest.TestCase):
         self.assertIsNone(item.date())
         self.assertTrue(item.is_next())
         self.assertEqual(str(item), "next")
+        with self.assertRaises(ValueError):
+            item.next_minor()
+        with self.assertRaises(ValueError):
+            item.next_major()
         with self.assertRaises(ValueError):
             VersionItem(NEXT_VERSION, "2026-01-01")
         with self.assertRaises(ValueError):
