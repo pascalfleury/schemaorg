@@ -8,11 +8,14 @@ from pathlib import Path
 from typing import Any
 import unicodedata
 
+from schemaorg.executor import TaskExecutor, shard_sequence
 from schemaorg.layout import Domain, OutputLayout
 from schemaorg.progress import ProgressReporter
 from schemaorg.site_bundle import SiteBundle
 from schemaorg.template_renderer import TemplateRenderer
 from schemaorg.term_view import TermKind
+
+_MAX_SHARDS: int = 64
 
 
 def _is_all(token: str) -> bool:
@@ -45,12 +48,14 @@ class RenderTermPagesTask:
         build_opts: Sequence[str],
         term_ids: Sequence[str],
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         self.bundle: SiteBundle = bundle
         self.output_layout: OutputLayout = output_layout
         self.build_opts: tuple[str, ...] = tuple(build_opts)
         self.term_ids: tuple[str, ...] = tuple(term_ids)
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def _stats_badges(self, uri: str) -> list[dict[str, str]]:
         if not uri:
@@ -78,28 +83,32 @@ class RenderTermPagesTask:
         if not term_list:
             return 0
 
-        renderer = TemplateRenderer(
-            self.bundle.input_layout,
-            self.bundle.target_version,
-            self.build_opts,
-        )
-        template = renderer.get_template("terms/TermPage.j2")
+        # Pre-create destination directories before concurrent workers write.
+        for term_id in term_list:
+            term = self.bundle.catalog.get(term_id)
+            if term is not None and term.termType != TermKind.REFERENCE:
+                term_output_path(self.output_layout, term.id)
 
-        written = 0
-        with self.progress.task(
-            "Rendering term pages",
-            total=len(term_list),
-            unit="pages",
-        ) as p:
-            for term_id in term_list:
-                p.step(term_id)
+        shards = shard_sequence(term_list, min(len(term_list), _MAX_SHARDS))
+
+        def _render_shard(
+            shard: tuple[str, ...],
+        ) -> tuple[int, int, list[str], str]:
+            renderer = TemplateRenderer(
+                self.bundle.input_layout,
+                self.bundle.target_version,
+                self.build_opts,
+            )
+            template = renderer.get_template("terms/TermPage.j2")
+            shard_written = 0
+            missing: list[str] = []
+            last_id = shard[-1]
+            for term_id in shard:
                 term = self.bundle.catalog.get(term_id)
                 if term is None:
-                    p.log(f"No such term: {term_id}", logging.ERROR)
-                    p.advance(1)
+                    missing.append(term_id)
                     continue
                 if term.termType == TermKind.REFERENCE:
-                    p.advance(1)
                     continue
 
                 try:
@@ -118,10 +127,25 @@ class RenderTermPagesTask:
                     term_output_path(self.output_layout, term.id).write_text(
                         html, encoding="utf-8"
                     )
-                    written += 1
+                    shard_written += 1
                 except Exception as exc:
                     exc.add_note(f"While building term_id {term_id}")
                     raise
-                p.advance(1)
+            return shard_written, len(shard), missing, last_id
+
+        written = 0
+        with self.progress.task(
+            "Rendering term pages",
+            total=len(term_list),
+            unit="pages",
+        ) as p:
+            for shard_written, count, missing, last_id in self.executor.map(
+                _render_shard, shards
+            ):
+                for term_id in missing:
+                    p.log(f"No such term: {term_id}", logging.ERROR)
+                p.step(last_id)
+                written += shard_written
+                p.advance(count)
 
         return written

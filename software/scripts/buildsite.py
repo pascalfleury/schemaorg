@@ -11,7 +11,11 @@ from pathlib import Path
 import sys
 
 from schemaorg import constants
-from schemaorg.executor import ProcessTaskExecutor, default_worker_count
+from schemaorg.executor import (
+    ProcessTaskExecutor,
+    ThreadTaskExecutor,
+    default_worker_count,
+)
 from schemaorg.layout import (
     Domain,
     InputLayout,
@@ -196,6 +200,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     target = version_registry.resolve(args.version)
     tests_dir = constants.PROJECT_ROOT / "software/tests"
     progress = LogProgressReporter(logger=log, log_steps=False)
+    workers = default_worker_count()
+    cpu_executor = ProcessTaskExecutor(workers)
+    io_executor = ThreadTaskExecutor(min(8, workers))
 
     build_all = bool(
         args.autobuild or args.release or args.shacltests or args.buildrelease
@@ -226,7 +233,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             output_layout=releases_out,
             version=target,
             progress=progress,
-            executor=ProcessTaskExecutor(default_worker_count()),
+            executor=cpu_executor,
         ).run()
 
         _run_shacl_validation(
@@ -255,6 +262,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             releases_layout=input_layout,
             target_version=target,
             progress=progress,
+            executor=io_executor,
         )
         site_dir = (
             Path(args.output)
@@ -271,6 +279,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             current_version=bundle.current_version,
             clear_first=bool(args.clearfirst or args.autobuild),
             progress=progress,
+            executor=io_executor,
         ).run()
 
         if (args.runtests or args.autobuild) and not tests_ran:
@@ -283,6 +292,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             build_opts=build_opts,
             term_ids=term_ids,
             progress=progress,
+            executor=cpu_executor,
         ).run()
 
         RenderDocsPagesTask(
@@ -291,6 +301,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             build_opts=build_opts,
             page_names=page_names,
             progress=progress,
+            executor=cpu_executor,
         ).run()
 
         if want_files:
@@ -300,7 +311,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 version=target,
                 vocab=bundle.vocab,
                 progress=progress,
-                executor=ProcessTaskExecutor(default_worker_count()),
+                executor=cpu_executor,
             ).run()
 
         if args.shacltests and not shacl_ran:

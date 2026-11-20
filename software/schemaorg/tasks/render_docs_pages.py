@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from schemaorg import constants
+from schemaorg.executor import TaskExecutor
 from schemaorg.layout import Domain, OutputLayout
-from schemaorg.progress import ProgressReporter, TaskProgress
+from schemaorg.progress import ProgressReporter
 from schemaorg.renderers import CountsRenderer
 from schemaorg.site_bundle import SiteBundle
 from schemaorg.tasks.export_term_list import format_term_lines
@@ -87,7 +88,7 @@ class ListingNode:
         catalog: TermViewCatalog,
         title: str,
         visit_set: set[str],
-        progress: TaskProgress,
+        warnings: list[str],
     ) -> None:
         termdesc = catalog.get(term)
         if not termdesc:
@@ -111,13 +112,12 @@ class ListingNode:
                 try:
                     self.subs.append(
                         ListingNode(
-                            child_id, catalog, "", visit_set, progress
+                            child_id, catalog, "", visit_set, warnings
                         )
                     )
                 except UnknownTermError as exc:
-                    progress.log(
-                        f"Error while building node {child_id} for {term}: {exc}",
-                        logging.WARNING,
+                    warnings.append(
+                        f"Error while building node {child_id} for {term}: {exc}"
                     )
         else:
             self.repeat = True
@@ -133,18 +133,20 @@ class RenderDocsPagesTask:
         build_opts: Sequence[str],
         page_names: Sequence[str],
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         self.bundle: SiteBundle = bundle
         self.output_layout: OutputLayout = output_layout
         self.build_opts: tuple[str, ...] = tuple(build_opts)
         self.page_names: tuple[str, ...] = tuple(page_names)
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def _render_page(
         self,
         page: str,
         renderer: TemplateRenderer,
-        progress: TaskProgress,
+        warnings: list[str],
     ) -> str:
         cat = self.bundle.catalog
         target = self.bundle.target_version
@@ -157,8 +159,8 @@ class RenderDocsPagesTask:
             )
         if page == "Full":
             listings = [
-                ListingNode("Thing", cat, "Types:", set(), progress),
-                ListingNode("DataType", cat, "DataTypes:", set(), progress),
+                ListingNode("Thing", cat, "Types:", set(), warnings),
+                ListingNode("DataType", cat, "DataTypes:", set(), warnings),
             ]
             return renderer.render(
                 f"docs/{page}.j2",
@@ -166,7 +168,7 @@ class RenderDocsPagesTask:
             )
         if page == "FullRelease":
             node_listings = [
-                ListingNode("Thing", cat, "Type hierarchy", set(), progress)
+                ListingNode("Thing", cat, "Type hierarchy", set(), warnings)
             ]
             type_uris = (*cat.vocab.enum_values, *cat.vocab.types)
             types = sorted(cat.views(type_uris), key=lambda t: t.id)
@@ -215,11 +217,32 @@ class RenderDocsPagesTask:
             else list(self.page_names)
         )
 
-        renderer = TemplateRenderer(
-            self.bundle.input_layout,
-            self.bundle.target_version,
-            self.build_opts,
-        )
+        valid_pages: list[str] = []
+        unknown_pages: list[str] = []
+        for page in requested:
+            if page in _PAGE_TARGETS:
+                valid_pages.append(page)
+            else:
+                unknown_pages.append(page)
+
+        # Pre-create output directories before concurrent workers write.
+        for page in valid_pages:
+            for domain, _ in _PAGE_TARGETS[page]:
+                self.output_layout.dir(domain)
+
+        def _render_and_write(page: str) -> tuple[str, list[str]]:
+            renderer = TemplateRenderer(
+                self.bundle.input_layout,
+                self.bundle.target_version,
+                self.build_opts,
+            )
+            warnings: list[str] = []
+            content = self._render_page(page, renderer, warnings)
+            for domain, filename in _PAGE_TARGETS[page]:
+                self.output_layout.file(domain, filename).write_text(
+                    content, encoding="utf-8"
+                )
+            return page, warnings
 
         written = 0
         with self.progress.task(
@@ -227,21 +250,16 @@ class RenderDocsPagesTask:
             total=len(requested),
             unit="pages",
         ) as p:
-            for page in requested:
-                targets = _PAGE_TARGETS.get(page)
-                if targets is None:
-                    p.log(
-                        f"Unknown or missing page name: {page}",
-                        logging.WARNING,
-                    )
-                    p.advance(1)
-                    continue
+            for page in unknown_pages:
+                p.log(f"Unknown or missing page name: {page}", logging.WARNING)
+                p.advance(1)
+
+            for page, warnings in self.executor.map(
+                _render_and_write, valid_pages
+            ):
+                for msg in warnings:
+                    p.log(msg, logging.WARNING)
                 p.step(page)
-                content = self._render_page(page, renderer, p)
-                for domain, filename in targets:
-                    self.output_layout.file(domain, filename).write_text(
-                        content, encoding="utf-8"
-                    )
                 written += 1
                 p.advance(1)
 

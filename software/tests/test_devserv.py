@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from schemaorg import constants as real_constants
+from schemaorg.executor import SequentialExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout
 from schemaorg.progress import NullProgressReporter
 from schemaorg.tasks.prepare_site_static import PrepareSiteStaticTask
@@ -186,6 +187,7 @@ class TestHandlersTemplateRouting(unittest.TestCase):
                 current_version=version_registry.current(),
                 clear_first=False,
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             ).run()
 
             rendered = (Path(tmp) / "gcloud/handlers.yaml").read_text(

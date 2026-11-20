@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from schemaorg.executor import ThreadTaskExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout
 from schemaorg.progress import LogProgressReporter
 from schemaorg.tasks.prepare_site_static import PrepareSiteStaticTask
@@ -59,6 +60,7 @@ class TestPrepareSiteStaticTask(unittest.TestCase):
                 current_version=VersionItem("30.1", "2026-09-16"),
                 clear_first=True,
                 progress=reporter,
+                executor=ThreadTaskExecutor(max_workers=2),
             ).run()
 
         self.assertTrue(gitkeep.is_file())

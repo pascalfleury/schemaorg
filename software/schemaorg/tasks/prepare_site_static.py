@@ -11,6 +11,7 @@ import shutil
 import markdown2  # type: ignore[import-untyped]
 
 from schemaorg import constants
+from schemaorg.executor import TaskExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout
 from schemaorg.progress import ProgressReporter
 from schemaorg.version import VersionItem
@@ -66,7 +67,7 @@ def _load_static_inserts(
 
 
 def _convert_md_docs(doc_dir: Path) -> None:
-    for md_path in doc_dir.glob("*.md"):
+    for md_path in sorted(doc_dir.glob("*.md")):
         text = md_path.read_text(encoding="utf-8")
         rng_state = random.getstate()
         try:
@@ -99,6 +100,7 @@ class PrepareSiteStaticTask:
         current_version: VersionItem,
         clear_first: bool,
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         self.input_layout: InputLayout = input_layout
         self.output_layout: OutputLayout = output_layout
@@ -106,6 +108,7 @@ class PrepareSiteStaticTask:
         self.current_version: VersionItem = current_version
         self.clear_first: bool = clear_first
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def _clear_output_dir(self) -> None:
         out_dir = self.output_layout.output_dir
@@ -132,43 +135,45 @@ class PrepareSiteStaticTask:
                 p.advance(1)
 
             self.output_layout.dir(Domain.EMPTY)
-
-            p.step("copying static docs")
             docs_dest = self.output_layout.dir(Domain.DOCS)
-            shutil.copytree(
-                self.input_layout.dir(Domain.DOCS),
-                docs_dest,
-                dirs_exist_ok=True,
-            )
-            _convert_md_docs(docs_dest)
-            p.advance(1)
-
-            p.step("applying static doc inserts")
-            inserts = list(
-                _load_static_inserts(self.input_layout, self.target_version)
-            )
-            for doc_path in sorted(docs_dest.glob("*.html")):
-                data = doc_path.read_text(encoding="utf-8")
-                if _STATIC_INSERT_MARKER_RE.search(data):
-                    for pattern, insert_content in inserts:
-                        data = pattern.sub(insert_content, data)
-                    doc_path.write_text(data, encoding="utf-8")
-            p.advance(1)
-
-            p.step("copying GCloud configs")
             gcloud_dest = self.output_layout.dir(Domain.GCLOUD)
-            for path in self.input_layout.files(Domain.GCLOUD, "*.yaml"):
-                shutil.copy(path, gcloud_dest)
-            p.advance(1)
 
-            p.step(f"rendering {_HANDLER_FILE}")
-            template_file = self.input_layout.file(
-                Domain.GCLOUD, _HANDLER_TEMPLATE
-            )
-            handler_data = template_file.read_text(encoding="utf-8").replace(
-                "{{ver}}", self.current_version.number()
-            )
-            self.output_layout.file(Domain.GCLOUD, _HANDLER_FILE).write_text(
-                handler_data, encoding="utf-8"
-            )
-            p.advance(1)
+            def _prepare_docs() -> None:
+                shutil.copytree(
+                    self.input_layout.dir(Domain.DOCS),
+                    docs_dest,
+                    dirs_exist_ok=True,
+                )
+                _convert_md_docs(docs_dest)
+                inserts = list(
+                    _load_static_inserts(self.input_layout, self.target_version)
+                )
+
+                def _apply_inserts(doc_path: Path) -> None:
+                    data = doc_path.read_text(encoding="utf-8")
+                    if _STATIC_INSERT_MARKER_RE.search(data):
+                        for pattern, insert_content in inserts:
+                            data = pattern.sub(insert_content, data)
+                        doc_path.write_text(data, encoding="utf-8")
+
+                for _ in self.executor.map(
+                    _apply_inserts, sorted(docs_dest.glob("*.html"))
+                ):
+                    pass
+
+            def _prepare_gcloud() -> None:
+                for path in self.input_layout.files(Domain.GCLOUD, "*.yaml"):
+                    shutil.copy(path, gcloud_dest)
+                template_file = self.input_layout.file(
+                    Domain.GCLOUD, _HANDLER_TEMPLATE
+                )
+                handler_data = template_file.read_text(
+                    encoding="utf-8"
+                ).replace("{{ver}}", self.current_version.number())
+                self.output_layout.file(
+                    Domain.GCLOUD, _HANDLER_FILE
+                ).write_text(handler_data, encoding="utf-8")
+
+            p.step("copying static docs and GCloud configs")
+            self.executor.run_all([_prepare_docs, _prepare_gcloud])
+            p.advance(4)

@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from schemaorg.executor import SequentialExecutor, ThreadTaskExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout, Releases
 from schemaorg.progress import LogProgressReporter, NullProgressReporter
 from schemaorg.site_bundle import SiteBundle
@@ -76,6 +77,7 @@ class TestSiteBundle(unittest.TestCase):
                 releases_layout=releases_out,
                 target_version=self.version.next(),
                 progress=reporter,
+                executor=ThreadTaskExecutor(max_workers=2),
             )
 
         self.assertEqual(bundle.release_file, ttl_path)
@@ -93,6 +95,7 @@ class TestSiteBundle(unittest.TestCase):
                 releases_layout=self.layout,
                 target_version=self.version.next(),
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             )
 
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from schemaorg.executor import ProcessTaskExecutor, SequentialExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout, Releases
 from schemaorg.progress import LogProgressReporter, NullProgressReporter
 from schemaorg.site_bundle import SiteBundle
@@ -78,6 +79,7 @@ class TestRenderTermPagesTask(unittest.TestCase):
             releases_layout=self.input_layout,
             target_version=self.version.next(),
             progress=NullProgressReporter(),
+            executor=SequentialExecutor(),
         )
 
     def test_term_output_path_routes_types_and_properties(self) -> None:
@@ -110,6 +112,7 @@ class TestRenderTermPagesTask(unittest.TestCase):
                 build_opts=(),
                 term_ids=("ALL",),
                 progress=reporter,
+                executor=ProcessTaskExecutor(max_workers=2),
             ).run()
 
         self.assertEqual(count, 2)

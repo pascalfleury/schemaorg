@@ -513,6 +513,7 @@ class TestPlan(unittest.TestCase):
                 releases_layout=input_layout,
                 target_version=version_obj.next(),
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             )
             ExportSiteMetadataTask(
                 input_layout=input_layout,
@@ -594,6 +595,7 @@ class TestPlan(unittest.TestCase):
                 releases_layout=input_layout,
                 target_version=version_obj.next(),
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             )
             catalog = bundle.catalog
 

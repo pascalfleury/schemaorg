@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from schemaorg.executor import ProcessTaskExecutor, SequentialExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout, Releases
 from schemaorg.progress import LogProgressReporter, NullProgressReporter
 from schemaorg.site_bundle import SiteBundle
@@ -64,6 +65,7 @@ class TestRenderDocsPagesTask(unittest.TestCase):
             releases_layout=self.input_layout,
             target_version=self.version.next(),
             progress=NullProgressReporter(),
+            executor=SequentialExecutor(),
         )
 
     def test_renders_selected_docs_pages_and_termfind(self) -> None:
@@ -78,6 +80,7 @@ class TestRenderDocsPagesTask(unittest.TestCase):
                 build_opts=(),
                 page_names=("Home", "Schemas", "Full", "TermFind"),
                 progress=reporter,
+                executor=ProcessTaskExecutor(max_workers=2),
             ).run()
 
         self.assertEqual(written, 4)
