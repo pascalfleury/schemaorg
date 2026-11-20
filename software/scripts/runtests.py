@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 
 from schemaorg import constants
+from schemaorg.executor import ProcessTaskExecutor, default_worker_count
 from schemaorg.progress import LogProgressReporter
 from schemaorg.tasks.run_unit_tests import RunUnitTestsTask
 import util.pretty_logger as pretty_logger
@@ -40,6 +41,7 @@ def main(
         tests_dir=Path(test_path),
         skip_basics=bool(args.skipbasics),
         progress=LogProgressReporter(logger=log, log_steps=False),
+        executor=ProcessTaskExecutor(default_worker_count()),
     ).run()
     return (
         summary.failure_count

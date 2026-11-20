@@ -137,6 +137,7 @@ def _run_unit_tests(tests_dir: Path, progress: LogProgressReporter) -> None:
         tests_dir=tests_dir,
         skip_basics=False,
         progress=progress,
+        executor=ProcessTaskExecutor(default_worker_count()),
     ).run()
     if not summary.ok:
         failures = (

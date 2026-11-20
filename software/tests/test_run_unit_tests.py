@@ -7,6 +7,7 @@ import tempfile
 import textwrap
 import unittest
 
+from schemaorg.executor import ProcessTaskExecutor, SequentialExecutor
 from schemaorg.progress import LogProgressReporter, NullProgressReporter
 from schemaorg.tasks.run_unit_tests import RunUnitTestsTask
 
@@ -52,6 +53,7 @@ class TestRunUnitTestsTask(unittest.TestCase):
                 tests_dir=self.tests_dir,
                 skip_basics=False,
                 progress=reporter,
+                executor=ProcessTaskExecutor(max_workers=2),
             ).run()
 
         self.assertEqual(summary.total_run, 3)
@@ -65,6 +67,7 @@ class TestRunUnitTestsTask(unittest.TestCase):
             tests_dir=self.tests_dir,
             skip_basics=True,
             progress=NullProgressReporter(),
+            executor=SequentialExecutor(),
         ).run()
         self.assertEqual(summary.total_run, 1)
         self.assertTrue(summary.ok)
