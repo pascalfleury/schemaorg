@@ -118,6 +118,11 @@ class ProcessTaskExecutor:
     Workers inherit lexical closures and read-only parent memory copy-on-write
     across os.fork(); only return values cross the result queue. Falls back to
     ThreadTaskExecutor when fork is unavailable or multiple threads are active.
+
+    shortcut: exists solely to bypass the Python 3.11 GIL for CPU-bound tasks
+    without pickling inputs; remove and switch all callers to ThreadTaskExecutor
+    once running on free-threaded (no-GIL) Python 3.13+, which avoids fork and
+    IPC overhead and makes execution faster.
     """
 
     def __init__(self, max_workers: int) -> None:
