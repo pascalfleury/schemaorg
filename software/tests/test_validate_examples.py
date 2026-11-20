@@ -7,9 +7,13 @@ import tempfile
 import textwrap
 import unittest
 
+import rdflib
+
+from schemaorg.executor import ProcessTaskExecutor, SequentialExecutor
 from schemaorg.layout import OutputLayout, Releases
 from schemaorg.progress import LogProgressReporter, NullProgressReporter
 from schemaorg.tasks.validate_examples import (
+    ExampleValidator,
     ShaclConfigError,
     ValidateExamplesTask,
 )
@@ -89,6 +93,7 @@ class TestValidateExamplesTask(unittest.TestCase):
                 invalid_only=False,
                 source_output=True,
                 progress=reporter,
+                executor=ProcessTaskExecutor(max_workers=2),
             ).run()
 
         self.assertEqual(summary.total_count, 2)
@@ -96,6 +101,30 @@ class TestValidateExamplesTask(unittest.TestCase):
         self.assertEqual(summary.error_count, 1)
         self.assertEqual(summary.failures[0].name, "eg-0002")
         self.assertIn("(2/2 examples)", "\n".join(captured.output))
+
+    def test_local_context_inlining_validates_and_rejects(self) -> None:
+        shapes = self.releases.file(
+            self.version.next(), protocol="", scope="shapes", extension=".shacl"
+        )
+        shacl_graph = rdflib.Graph().parse(shapes, format="turtle")
+        engine = ExampleValidator(
+            shacl_graph=shacl_graph,
+            ont_graph=rdflib.Graph(),
+            local_context={"@vocab": "http://schema.org/"},
+        )
+        good = _make_example(
+            "eg-ok",
+            '{"@context":"https://schema.org","@type":"Person","name":"Jane"}',
+        )
+        bad = _make_example(
+            "eg-bad",
+            '{"@context":["https://schema.org/"],'
+            '"@type":"Person","name":{"@type":"Person","name":"x"}}',
+        )
+        ok_res = engine.validate(good)
+        bad_res = engine.validate(bad)
+        self.assertTrue(ok_res.targeted and ok_res.conforms)
+        self.assertTrue(bad_res.targeted and not bad_res.conforms)
 
     def test_raises_shacl_config_error_when_examples_empty(self) -> None:
         with self.assertRaises(ShaclConfigError):
@@ -106,6 +135,7 @@ class TestValidateExamplesTask(unittest.TestCase):
                 invalid_only=True,
                 source_output=False,
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             ).run()
 
 

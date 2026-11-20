@@ -23,6 +23,7 @@ import rdflib
 from rdflib.namespace import SH
 
 from schemaorg import constants
+from schemaorg.executor import SequentialExecutor
 from schemaorg.layout import Domain, InputLayout, OutputLayout, Releases
 from schemaorg.progress import LogProgressReporter
 from schemaorg.tasks.validate_examples import (
@@ -75,7 +76,7 @@ class ValidateExampleTests(unittest.TestCase):
         cls.shapes.parse(data=shapes_turtle, format="turtle")
         cls.ontology = rdflib.Graph()
         cls.engine = ExampleValidator(
-            shacl_graph=cls.shapes, ont_graph=cls.ontology
+            shacl_graph=cls.shapes, ont_graph=cls.ontology, local_context=None
         )
 
     def validate(self, name: str, jsonld: str) -> ExampleResult:
@@ -96,7 +97,9 @@ class ValidateExampleTests(unittest.TestCase):
     def testShapesWithoutTargetsCannotBuildAValidator(self) -> None:
         with self.assertRaises(ValueError):
             ExampleValidator(
-                shacl_graph=rdflib.Graph(), ont_graph=rdflib.Graph()
+                shacl_graph=rdflib.Graph(),
+                ont_graph=rdflib.Graph(),
+                local_context=None,
             )
 
     def testValidExampleConforms(self) -> None:
@@ -187,6 +190,7 @@ class ValidateExampleTests(unittest.TestCase):
                     invalid_only=False,
                     source_output=True,
                     progress=LogProgressReporter(logger=logger, log_steps=True),
+                    executor=SequentialExecutor(),
                 ).run()
 
         joined = "\n".join(captured.output)
@@ -267,7 +271,9 @@ class ShaclGateLivenessTests(unittest.TestCase):
             return
 
         cls.shapes = shapes
-        engine = ExampleValidator(shacl_graph=shapes, ont_graph=ontology)
+        engine = ExampleValidator(
+            shacl_graph=shapes, ont_graph=ontology, local_context=None
+        )
         cls.result = engine.validate(FakeExample("canary", cls.canary_payload()))
 
     @classmethod

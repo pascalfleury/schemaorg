@@ -11,6 +11,7 @@ from pathlib import Path
 import sys
 
 from schemaorg import constants
+from schemaorg.executor import ProcessTaskExecutor, default_worker_count
 from schemaorg.layout import (
     Domain,
     InputLayout,
@@ -168,6 +169,7 @@ def _run_shacl_validation(
             invalid_only=True,
             source_output=False,
             progress=progress,
+            executor=ProcessTaskExecutor(default_worker_count()),
         ).run()
     except ShaclConfigError as exc:
         log.error("SHACL validation reported errors: %s", exc)
