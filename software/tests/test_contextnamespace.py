@@ -32,9 +32,9 @@ import unittest
 import rdflib
 from rdflib.namespace import SH
 
-from schemaorg.layout import Releases
-import util.paths as paths
-import util.schema as schema
+from schemaorg import constants
+from schemaorg.layout import Domain, InputLayout, Releases
+from schemaorg.version import Version
 
 
 class ContextShapesNamespaceTests(unittest.TestCase):
@@ -47,9 +47,11 @@ class ContextShapesNamespaceTests(unittest.TestCase):
 
     @classmethod
     def _release_file(cls, filename: str) -> Path:
-        return Releases(paths.DefaultInputLayout(), schema.VERSION).file(
-            filename=filename
+        input_layout = InputLayout(constants.PROJECT_ROOT)
+        version_registry = Version(
+            input_layout.file(Domain.ROOT, constants.VERSIONS_FILE)
         )
+        return Releases(input_layout, version_registry).file(filename=filename)
 
     def _load_vocab(self) -> tuple[str | None, Path]:
         path = self._release_file(self.CONTEXT_FILENAME)

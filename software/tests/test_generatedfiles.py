@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-import util.paths as paths
+from schemaorg import constants
+from schemaorg.layout import Domain, InputLayout
 
 
 class BasicFileTests(unittest.TestCase):
@@ -15,13 +16,13 @@ class BasicFileTests(unittest.TestCase):
 
     def testNoHttpExamples(self) -> None:
         """Examples must use https://schema.org, never http://schema.org."""
-        layout = paths.DefaultInputLayout()
-        files = layout.files(paths.Domain.DATA, self.EXAMPLE_GLOBS)
+        layout = InputLayout(constants.PROJECT_ROOT)
+        files = layout.files(Domain.DATA, self.EXAMPLE_GLOBS)
 
         self.assertTrue(
             files,
             f"No example files matched {self.EXAMPLE_GLOBS} under "
-            f"{layout.dir(paths.Domain.DATA)}",
+            f"{layout.dir(Domain.DATA)}",
         )
 
         offenders: list[str] = []

@@ -7,18 +7,19 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from colorama import Fore, Style
+from colorama import Fore, Style  # type: ignore[import-untyped]
 from flask import Flask, Response, abort, after_this_request, send_from_directory
 
 from schemaorg import constants
-from schemaorg.layout import InputLayout, Releases
-from util.schema import VERSION, config, constants as schema_constants
+from schemaorg.layout import Domain, InputLayout, Releases
+from schemaorg.version import Version
 
-_docs: Path = Path(schema_constants.DOCSDOCSDIR.lstrip("/"))
+VERSION: Version = Version(constants.PROJECT_ROOT / constants.VERSIONS_FILE)
+_docs: Path = Path(Domain.DOCS)
 
 app: Flask = Flask(
     __name__,
-    static_folder=str(constants.PROJECT_ROOT / config.OUTPUTDIR),
+    static_folder=str(constants.PROJECT_ROOT / "software/site"),
     static_url_path="",
 )
 

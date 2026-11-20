@@ -8,9 +8,11 @@ import unittest
 from unittest.mock import patch
 
 import rdflib
+from schemaorg import markdown
 from schemaorg.graph_loader import split_release_graphs
 from schemaorg.layout import Domain, InputLayout, OutputLayout, Releases, Scope
 from schemaorg.model import SDO, VocabularyLoader
+from schemaorg.progress import NullProgressReporter
 from schemaorg.renderers import (
     CountsRenderer,
     CsvRenderer,
@@ -25,11 +27,9 @@ from schemaorg.renderers import (
     render_sitemap,
     uriwrap,
 )
-from schemaorg import markdown
+from schemaorg.site_bundle import SiteBundle
 from schemaorg.version import Version, VersionItem
 import scripts.buildfiles as buildfiles
-import scripts.buildsite as buildsite
-import util.schema as schema
 
 FIXTURE_TTL = """
 @prefix : <https://schema.org/> .
@@ -531,8 +531,6 @@ class TestPlan(unittest.TestCase):
     def testStage1ReleaseExportDoesNotLeakStateIntoStage2SiteBuild(
         self,
     ) -> None:
-        orig_target = schema.config.TARGET_VERSION
-        self.addCleanup(setattr, schema.config, "TARGET_VERSION", orig_target)
         prev_wpre = markdown.MarkdownTool.WPRE
         self.addCleanup(markdown.MarkdownTool.setWikilinkPrePath, prev_wpre)
 
@@ -557,7 +555,6 @@ class TestPlan(unittest.TestCase):
             version_obj = Version(in_dir / "versions.json")
 
             markdown.MarkdownTool.setWikilinkPrePath("/")
-            schema.config.TARGET_VERSION = "next"
 
             buildfiles.export_release_files(
                 input_layout=input_layout, output_layout=release_out_layout
@@ -565,10 +562,13 @@ class TestPlan(unittest.TestCase):
 
             self.assertEqual(markdown.MarkdownTool.WPRE, "/")
 
-            with patch.object(buildsite.schema, "VERSION", version_obj):
-                catalog, _, _ = buildsite.load_site_bundle(
-                    input_layout=input_layout, target=version_obj.next()
-                )
+            bundle = SiteBundle.from_release(
+                input_layout=input_layout,
+                releases_layout=input_layout,
+                target_version=version_obj.next(),
+                progress=NullProgressReporter(),
+            )
+            catalog = bundle.catalog
 
             self.assertNotIn(
                 rdflib.URIRef("https://example.org/foreign-dataset"),

@@ -10,70 +10,26 @@ import os
 from pathlib import Path
 import sys
 
-from schemaorg.layout import NEXT_VERSION, OutputLayout, Releases
+from schemaorg import constants
+from schemaorg.layout import Domain, InputLayout, NEXT_VERSION, OutputLayout, Releases
 from schemaorg.layout.releases import VersionRef
 from schemaorg.progress import LogProgressReporter
 from schemaorg.tasks.validate_examples import (
-    ExampleResult,
-    ExampleValidator,
     ShaclConfigError,
     ValidatableExample,
     ValidateExamplesTask,
-    format_numbered_source,
 )
+from schemaorg.version import Version
 import SchemaExamples.schemaexamples as schemaexamples
-import util.paths as paths
-import util.schema as schema
 
 log: logging.Logger = logging.getLogger(__name__)
 
 
-def load_examples() -> list[schemaexamples.Example]:
+def load_examples(input_layout: InputLayout) -> list[schemaexamples.Example]:
     """Find and load all JSON-LD examples."""
-    loaded = schemaexamples.SchemaExamples.from_layout(
-        paths.DefaultInputLayout()
-    )
+    loaded = schemaexamples.SchemaExamples.from_layout(input_layout)
     log.info("Loaded %d examples, processing JSON-LD variants", len(loaded))
     return [ex for ex in loaded.allExamples() if ex.hasJsonld()]
-
-
-class ValidationStats:
-    """Compatibility accumulator logging example validation outcomes."""
-
-    def __init__(
-        self, total: int, invalid_only: bool, source_output: bool
-    ) -> None:
-        self.total = total
-        self.invalid_only = invalid_only
-        self.source_output = source_output
-        self.count: int = 0
-        self.error_count: int = 0
-        self.targeted_count: int = 0
-        log.info("Validating %d examples", self.total)
-
-    def add(self, result: ExampleResult) -> None:
-        self.count += 1
-        if not self.invalid_only:
-            log.info("Validating example %s", result.name)
-        if result.targeted:
-            self.targeted_count += 1
-
-        failed = result.error is not None or not result.conforms
-        if result.error is not None:
-            self.error_count += 1
-            log.error("Invalid JSON example %s: %s", result.name, result.error)
-        elif not result.conforms:
-            self.error_count += 1
-            log.error(
-                "Validation failed for example %s:\n%s",
-                result.name,
-                result.report,
-            )
-        if self.source_output and failed:
-            log.info(
-                "Source:\n%s",
-                format_numbered_source(result.example.getJsonldRaw()),
-            )
 
 
 def validate_examples(
@@ -84,7 +40,14 @@ def validate_examples(
     version: VersionRef = NEXT_VERSION,
 ) -> None:
     """Validate examples via ValidateExamplesTask and map failures to exit codes."""
-    rel = releases or Releases(paths.DefaultInputLayout(), schema.VERSION)
+    if releases is None:
+        input_layout = InputLayout(constants.PROJECT_ROOT)
+        version_registry = Version(
+            input_layout.file(Domain.ROOT, constants.VERSIONS_FILE)
+        )
+        rel = Releases(input_layout, version_registry)
+    else:
+        rel = releases
     resolved = rel.resolve(version)
     reporter = LogProgressReporter(logger=log, log_steps=not invalid_only)
     try:
@@ -133,16 +96,18 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    layout = (
-        OutputLayout(Path(args.output))
-        if args.output
-        else paths.DefaultInputLayout()
+    input_layout = InputLayout(constants.PROJECT_ROOT)
+    version_registry = Version(
+        input_layout.file(Domain.ROOT, constants.VERSIONS_FILE)
+    )
+    releases_layout: InputLayout | OutputLayout = (
+        OutputLayout(Path(args.output)) if args.output else input_layout
     )
     validate_examples(
-        examples=load_examples(),
+        examples=load_examples(input_layout),
         invalid_only=args.invalidonly,
         source_output=args.sourceoutput,
-        releases=Releases(layout, schema.VERSION),
+        releases=Releases(releases_layout, version_registry),
         version=args.version,
     )
 

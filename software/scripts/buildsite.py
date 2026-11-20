@@ -11,7 +11,6 @@ from pathlib import Path
 import sys
 
 from schemaorg import constants
-from schemaorg.jsonld_slice import TermJsonLdIndex
 from schemaorg.layout import (
     Domain,
     InputLayout,
@@ -20,7 +19,7 @@ from schemaorg.layout import (
     Releases,
     checkDataDirectories,
 )
-from schemaorg.progress import LogProgressReporter, NullProgressReporter
+from schemaorg.progress import LogProgressReporter
 from schemaorg.site_bundle import SiteBundle
 from schemaorg.tasks.export_release_files import ExportReleaseFilesTask
 from schemaorg.tasks.export_site_metadata import ExportSiteMetadataTask
@@ -32,19 +31,12 @@ from schemaorg.tasks.validate_examples import (
     ShaclConfigError,
     ValidateExamplesTask,
 )
-from schemaorg.term_view import TermViewCatalog
 from schemaorg.version import Version, VersionItem
 from SchemaExamples.schemaexamples import SchemaExamples
-import util.paths as paths
 import util.pretty_logger as pretty_logger
-import util.schema as schema
 
 log: logging.Logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-
-args: argparse.Namespace = argparse.Namespace(
-    clearfirst=False, autobuild=False
-)
 
 
 def _parse_args(args_list: Sequence[str] | None = None) -> argparse.Namespace:
@@ -139,36 +131,6 @@ def _parse_args(args_list: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(args_list)
 
 
-def initdir(output_dir_str: str | Path) -> None:
-    """Compatibility wrapper preparing static docs and GCloud config."""
-    input_layout = paths.DefaultInputLayout()
-    output_layout = OutputLayout(Path(output_dir_str))
-    PrepareSiteStaticTask(
-        input_layout=input_layout,
-        output_layout=output_layout,
-        target_version=schema.target_version(),
-        current_version=schema.VERSION.current(),
-        clear_first=bool(args.clearfirst or args.autobuild),
-        progress=LogProgressReporter(logger=log, log_steps=False),
-    ).run()
-
-
-def load_site_bundle(
-    input_layout: InputLayout | None = None,
-    target: VersionItem | None = None,
-) -> tuple[TermViewCatalog, TermJsonLdIndex, Path]:
-    """Compatibility wrapper returning (catalog, jsonld_index, release_file)."""
-    layout = input_layout or paths.DefaultInputLayout()
-    resolved = target or schema.target_version()
-    bundle = SiteBundle.from_release(
-        input_layout=layout,
-        releases_layout=layout,
-        target_version=resolved,
-        progress=NullProgressReporter(),
-    )
-    return bundle.catalog, bundle.jsonld_index, bundle.release_file
-
-
 def _run_unit_tests(tests_dir: Path, progress: LogProgressReporter) -> None:
     summary = RunUnitTestsTask(
         tests_dir=tests_dir,
@@ -219,26 +181,7 @@ def _run_shacl_validation(
         sys.exit(1)
 
 
-def runShaclTests(releases_output_dir: str | Path | None = None) -> None:
-    """Compatibility wrapper running SHACL example validation in-process."""
-    input_layout = paths.DefaultInputLayout()
-    releases_layout: InputLayout | OutputLayout = (
-        OutputLayout(Path(releases_output_dir))
-        if releases_output_dir is not None
-        else input_layout
-    )
-    _run_shacl_validation(
-        input_layout=input_layout,
-        releases_layout=releases_layout,
-        version_registry=schema.VERSION,
-        target_version=schema.target_version(),
-        examples=None,
-        progress=LogProgressReporter(logger=log, log_steps=False),
-    )
-
-
 def main(argv: Sequence[str] | None = None) -> None:
-    global args
     pretty_logger.MakeRootLogPretty()
     args = _parse_args(argv)
     checkDataDirectories()

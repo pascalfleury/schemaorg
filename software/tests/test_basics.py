@@ -9,12 +9,11 @@ import rdflib
 
 from schemaorg import constants, markdown
 from schemaorg.graph_loader import GraphLoader
-from schemaorg.layout import InputLayout, Issues, Releases
+from schemaorg.layout import Domain, InputLayout, Issues, Releases
 from schemaorg.model import Vocabulary, VocabularyLoader
 from schemaorg.term_view import TermKind, TermView, TermViewCatalog
+from schemaorg.version import Version
 import SchemaExamples.schemaexamples as schemaexamples
-import util.paths as paths
-import util.schema as schema
 
 VOCABURI = constants.SCHEMA_URI
 
@@ -453,9 +452,13 @@ class BasicJSONLDTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        context_file = Releases(
-            paths.DefaultInputLayout(), schema.VERSION
-        ).file(filename="schemaorgcontext.jsonld")
+        input_layout = InputLayout(constants.PROJECT_ROOT)
+        version_registry = Version(
+            input_layout.file(Domain.ROOT, constants.VERSIONS_FILE)
+        )
+        context_file = Releases(input_layout, version_registry).file(
+            filename="schemaorgcontext.jsonld"
+        )
         try:
             cls.ctx = json.loads(context_file.read_text(encoding="utf-8"))
         except OSError as exc:

@@ -17,7 +17,6 @@ from schemaorg.layout import (
     Scope,
 )
 from schemaorg.version import Version
-import util.schema as schema
 
 MODERN_FILES = (
     "schemaorg-all-https.ttl",
@@ -234,7 +233,10 @@ class TestReleasesRealData(unittest.TestCase):
 
     def setUp(self) -> None:
         self.input_layout = InputLayout(constants.PROJECT_ROOT)
-        self.releases = Releases(self.input_layout, schema.VERSION)
+        version_registry = Version(
+            self.input_layout.file(Domain.ROOT, constants.VERSIONS_FILE)
+        )
+        self.releases = Releases(self.input_layout, version_registry)
 
     def test_versions_file_is_richly_populated(self) -> None:
         self.assertGreater(len(self.releases.versions()), 40)

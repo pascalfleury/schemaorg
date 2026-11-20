@@ -12,11 +12,11 @@ from urllib.parse import urlparse
 from rdflib import Graph, RDF, URIRef
 import requests
 
+from schemaorg import constants
 from schemaorg.graph_loader import GraphLoader
-from schemaorg.layout import Releases
+from schemaorg.layout import Domain, InputLayout, Releases
 from schemaorg.sdo_uri import SCHEMA_URL, SDO, SdoUri
-import util.paths as paths
-import util.schema as schema
+from schemaorg.version import Version
 
 DEFAULT_SEARCH_TERM: str = "klzzwxh"
 
@@ -89,7 +89,11 @@ def check_url(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    default_vocab = Releases(paths.DefaultInputLayout(), schema.VERSION).file()
+    input_layout = InputLayout(constants.PROJECT_ROOT)
+    version_registry = Version(
+        input_layout.file(Domain.ROOT, constants.VERSIONS_FILE)
+    )
+    default_vocab = Releases(input_layout, version_registry).file()
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

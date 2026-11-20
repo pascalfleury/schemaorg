@@ -8,10 +8,11 @@ import unittest
 from unittest.mock import patch
 
 from schemaorg import constants as real_constants
+from schemaorg.layout import Domain, InputLayout, OutputLayout
+from schemaorg.progress import NullProgressReporter
+from schemaorg.tasks.prepare_site_static import PrepareSiteStaticTask
 from schemaorg.version import Version
-import scripts.buildsite as buildsite
 import scripts.devserv as devserv
-import util.schema as schema
 
 
 class TestDevservVersionRoutes(unittest.TestCase):
@@ -170,24 +171,27 @@ class TestHandlersTemplateRouting(unittest.TestCase):
             self._resolve("/version/31.0"), "docs/fullrelease.html"
         )
 
-    def test_initdir_binds_latest_handler_to_published_version(self) -> None:
-        orig_target = schema.config.TARGET_VERSION
-        orig_output = schema.config.OUTPUTDIR
-        self.addCleanup(setattr, schema.config, "TARGET_VERSION", orig_target)
-        self.addCleanup(setattr, schema.config, "OUTPUTDIR", orig_output)
-
+    def test_prepare_static_binds_latest_handler_to_published_version(
+        self,
+    ) -> None:
+        input_layout = InputLayout(real_constants.PROJECT_ROOT)
+        version_registry = Version(
+            input_layout.file(Domain.ROOT, real_constants.VERSIONS_FILE)
+        )
         with tempfile.TemporaryDirectory() as tmp:
-            schema.config.TARGET_VERSION = "next"
-            schema.config.OUTPUTDIR = tmp
-            buildsite.args = buildsite.argparse.Namespace(
-                clearfirst=False, autobuild=False
-            )
-            buildsite.initdir(tmp)
+            PrepareSiteStaticTask(
+                input_layout=input_layout,
+                output_layout=OutputLayout(Path(tmp)),
+                target_version=version_registry.next(),
+                current_version=version_registry.current(),
+                clear_first=False,
+                progress=NullProgressReporter(),
+            ).run()
 
             rendered = (Path(tmp) / "gcloud/handlers.yaml").read_text(
                 encoding="utf-8"
             )
-            expected_ver = schema.VERSION.current().number()
+            expected_ver = version_registry.current().number()
             self.assertIn(f"releases/{expected_ver}/\\1", rendered)
             self.assertNotIn("releases/next/\\1", rendered)
 

@@ -7,7 +7,8 @@ import argparse
 from collections.abc import Sequence
 from datetime import date
 
-from util.schema import VERSION
+from schemaorg import constants
+from schemaorg.version import Version
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -23,10 +24,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Release date in YYYY-MM-DD format (defaults to today when --add is set).",
     )
     args = parser.parse_args(argv)
+    version = Version(constants.PROJECT_ROOT / constants.VERSIONS_FILE)
     if args.add:
         release_date = args.date or date.today().isoformat()
-        VERSION.add_version(args.add, release_date)
-    print(VERSION.current().number())
+        version.add_version(args.add, release_date)
+    print(version.current().number())
 
 
 if __name__ == "__main__":
