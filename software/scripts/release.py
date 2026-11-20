@@ -38,7 +38,11 @@ from schemaorg.layout import (
     Releases,
     checkDataDirectories,
 )
-from schemaorg.progress import LogProgressReporter, ProgressReporter
+from schemaorg.progress import (
+    ProgressReporter,
+    RichProgressReporter,
+    configure_rich_logging,
+)
 from schemaorg.release.changelog import (
     ReleaseChanges,
     canonical_repo_url,
@@ -74,9 +78,6 @@ from schemaorg.tasks.validate_examples import (
 )
 from schemaorg.version import Version, VersionItem
 from SchemaExamples.schemaexamples import SchemaExamples
-import util.pretty_logger as pretty_logger
-
-log: logging.Logger = logging.getLogger(__name__)
 
 EditorFn = Callable[[str], str]
 
@@ -458,92 +459,120 @@ def run_release(
 
     target_version = version_registry.resolve(new_version)
     releases_out = OutputLayout(input_layout.dir(Domain.DATA))
-
-    # Build canonical release artifacts into data/releases/<new_version>/.
-    ExportReleaseFilesTask(
-        input_layout=input_layout,
-        output_layout=releases_out,
-        version=target_version,
-        progress=progress,
-        executor=cpu_executor,
-    ).run()
-
-    # Gate: unit tests.
-    test_summary = RunUnitTestsTask(
-        tests_dir=tests_dir,
-        skip_basics=False,
-        progress=progress,
-        executor=cpu_executor,
-    ).run()
-    if not test_summary.ok:
-        out.print("[bold red]Unit tests failed; stopping before commit/deploy.[/bold red]")
-        return 1
-
-    # Gate: SHACL example validation against the new release.
-    examples = SchemaExamples.from_layout(input_layout)
-    jsonld_examples = [ex for ex in examples.allExamples() if ex.hasJsonld()]
-    try:
-        val_summary = ValidateExamplesTask(
-            releases=Releases(releases_out, version_registry),
-            version=target_version,
-            examples=jsonld_examples,
-            invalid_only=True,
-            source_output=False,
-            progress=progress,
-            executor=cpu_executor,
-        ).run()
-    except ShaclConfigError as exc:
-        out.print(f"[bold red]SHACL configuration error:[/bold red] {exc}")
-        return os.EX_CONFIG
-    if val_summary.error_count:
-        out.print(
-            f"[bold red]SHACL validation failed ({val_summary.error_count} invalid examples); "
-            "stopping before commit/deploy.[/bold red]"
-        )
-        return 1
-
-    # Build full site in canonical software/site/ targeting the new release.
-    bundle = SiteBundle.from_release(
-        input_layout=input_layout,
-        releases_layout=input_layout,
-        target_version=target_version,
-        progress=progress,
-        executor=io_executor,
-    )
     site_output = OutputLayout(site_dir)
-    PrepareSiteStaticTask(
-        input_layout=input_layout,
-        output_layout=site_output,
-        target_version=target_version,
-        current_version=bundle.current_version,
-        clear_first=True,
-        progress=progress,
-        executor=io_executor,
-    ).run()
-    RenderTermPagesTask(
-        bundle=bundle,
-        output_layout=site_output,
-        build_opts=(),
-        term_ids=("ALL",),
-        progress=progress,
-        executor=cpu_executor,
-    ).run()
-    RenderDocsPagesTask(
-        bundle=bundle,
-        output_layout=site_output,
-        build_opts=(),
-        page_names=("ALL",),
-        progress=progress,
-        executor=cpu_executor,
-    ).run()
-    ExportSiteMetadataTask(
-        input_layout=input_layout,
-        output_layout=site_output,
-        version=target_version,
-        vocab=bundle.vocab,
-        progress=progress,
-        executor=cpu_executor,
-    ).run()
+
+    def _run_stages() -> tuple[int, str | None]:
+        with progress.task(
+            f"Releasing {constants.SITENAME} ({new_version})",
+            total=4,
+            unit="stages",
+        ) as overall:
+            overall.step("release files")
+            ExportReleaseFilesTask(
+                input_layout=input_layout,
+                output_layout=releases_out,
+                version=target_version,
+                progress=progress,
+                executor=cpu_executor,
+            ).run()
+            overall.advance(1)
+
+            overall.step("unit tests")
+            test_summary = RunUnitTestsTask(
+                tests_dir=tests_dir,
+                skip_basics=False,
+                progress=progress,
+                executor=cpu_executor,
+            ).run()
+            if not test_summary.ok:
+                return (
+                    1,
+                    "[bold red]Unit tests failed; stopping before commit/deploy.[/bold red]",
+                )
+            overall.advance(1)
+
+            overall.step("SHACL validation")
+            examples = SchemaExamples.from_layout(input_layout)
+            jsonld_examples = [
+                ex for ex in examples.allExamples() if ex.hasJsonld()
+            ]
+            try:
+                val_summary = ValidateExamplesTask(
+                    releases=Releases(releases_out, version_registry),
+                    version=target_version,
+                    examples=jsonld_examples,
+                    invalid_only=False,
+                    source_output=False,
+                    progress=progress,
+                    executor=cpu_executor,
+                ).run()
+            except ShaclConfigError as exc:
+                return (
+                    os.EX_CONFIG,
+                    f"[bold red]SHACL configuration error:[/bold red] {exc}",
+                )
+            if val_summary.error_count:
+                return (
+                    1,
+                    f"[bold red]SHACL validation failed "
+                    f"({val_summary.error_count} invalid examples); "
+                    "stopping before commit/deploy.[/bold red]",
+                )
+            overall.advance(1)
+
+            overall.step("site")
+            site_prep = io_executor.run_all([
+                lambda: SiteBundle.from_release(
+                    input_layout=input_layout,
+                    releases_layout=input_layout,
+                    target_version=target_version,
+                    progress=progress,
+                    executor=io_executor,
+                ),
+                lambda: PrepareSiteStaticTask(
+                    input_layout=input_layout,
+                    output_layout=site_output,
+                    target_version=target_version,
+                    current_version=target_version,
+                    clear_first=True,
+                    progress=progress,
+                    executor=io_executor,
+                ).run(),
+            ])
+            bundle = site_prep[0]
+            assert isinstance(bundle, SiteBundle)
+            RenderTermPagesTask(
+                bundle=bundle,
+                output_layout=site_output,
+                build_opts=(),
+                term_ids=("ALL",),
+                progress=progress,
+                executor=cpu_executor,
+            ).run()
+            RenderDocsPagesTask(
+                bundle=bundle,
+                output_layout=site_output,
+                build_opts=(),
+                page_names=("ALL",),
+                progress=progress,
+                executor=cpu_executor,
+            ).run()
+            ExportSiteMetadataTask(
+                input_layout=input_layout,
+                output_layout=site_output,
+                version=target_version,
+                vocab=bundle.vocab,
+                progress=progress,
+                executor=cpu_executor,
+            ).run()
+            overall.advance(1)
+        return 0, None
+
+    stage_rc, stage_err = _run_stages()
+    if stage_rc != 0:
+        if stage_err:
+            out.print(stage_err)
+        return stage_rc
 
     # Git commit, tag, and push gate.
     git_files = [
@@ -628,8 +657,8 @@ def run_release(
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO)
-    pretty_logger.MakeRootLogPretty()
+    console = Console()
+    configure_rich_logging(console, level=logging.WARNING)
     args = parse_args(argv)
     checkDataDirectories()
 
@@ -638,9 +667,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         repo_root=constants.PROJECT_ROOT,
         dry_run=bool(args.dry_run),
         release_date=args.date,
-        progress=LogProgressReporter(logger=log, log_steps=False),
+        progress=RichProgressReporter(console=console),
         cpu_executor=cpu_executor,
         io_executor=io_executor,
+        console=console,
     )
     if exit_code:
         sys.exit(exit_code)

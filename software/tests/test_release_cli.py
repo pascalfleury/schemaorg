@@ -12,8 +12,13 @@ from typing import Any
 
 from rich.console import Console
 
-from schemaorg.executor import SequentialExecutor, default_worker_count
-from schemaorg.progress import NullProgressReporter
+from schemaorg import constants
+from schemaorg.executor import (
+    SequentialExecutor,
+    ThreadTaskExecutor,
+    default_worker_count,
+)
+from schemaorg.progress import NullProgressReporter, RichProgressReporter
 import scripts.release as release_cli
 
 _MINI_TTL = """
@@ -290,14 +295,13 @@ class TestReleaseCli(unittest.TestCase):
 
             # Inputs: [1] Minor (30.2), print brief? n, proceed build? y,
             # commit/tag/push? y, gcloud target [3] prod only, migrate? y
-            seq = SequentialExecutor()
             rc = release_cli.run_release(
                 repo_root=repo,
                 dry_run=False,
                 release_date="2026-11-20",
-                progress=NullProgressReporter(),
-                cpu_executor=seq,
-                io_executor=seq,
+                progress=RichProgressReporter(console=console),
+                cpu_executor=SequentialExecutor(),
+                io_executor=ThreadTaskExecutor(2),
                 console=console,
                 input_stream=io.StringIO("1\nn\ny\ny\n3\ny\n"),
                 editor_fn=lambda t: t,
@@ -306,6 +310,12 @@ class TestReleaseCli(unittest.TestCase):
             )
 
             self.assertEqual(rc, 0, buf.getvalue())
+            transcript = buf.getvalue()
+            self.assertIn("Comparing vocabulary graphs", transcript)
+            self.assertIn(f"Releasing {constants.SITENAME} (30.2)", transcript)
+            self.assertIn("Exporting release files (30.2)", transcript)
+            self.assertIn("Loading site bundle (30.2)", transcript)
+            self.assertIn("Preparing static site files", transcript)
             self.assertIn(
                 '"schemaversion": "30.2"',
                 (repo / "versions.json").read_text(encoding="utf-8"),

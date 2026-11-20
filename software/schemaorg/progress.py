@@ -1,13 +1,32 @@
-"""Progress reporting protocol and logger-backed implementations."""
+"""Progress reporting protocol and logger/Rich implementations."""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 import logging
+import threading
+import time
+from types import TracebackType
 from typing import Protocol
 
+from rich.console import Console
+from rich.logging import RichHandler
+from rich.markup import escape
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TaskID,
+    TextColumn,
+    TimeElapsedColumn,
+)
+from rich.table import Column
+
 import util.pretty_logger as pretty_logger
+
+_REFRESH_INTERVAL_SECONDS: float = 1.0 / 25.0
 
 
 class TaskProgress(Protocol):
@@ -111,3 +130,194 @@ class LogProgressReporter:
                 block.append(f"({handle.completed}/{total} {unit})")
             elif handle.completed:
                 block.append(f"({handle.completed} {unit})")
+
+
+def configure_rich_logging(
+    console: Console, level: int = logging.WARNING
+) -> None:
+    """Route root logging through RichHandler so logs print cleanly above bars."""
+    logging.basicConfig(
+        level=level,
+        format="%(message)s",
+        handlers=[
+            RichHandler(
+                console=console,
+                show_time=False,
+                show_path=False,
+                markup=False,
+            )
+        ],
+        force=True,
+    )
+
+
+class _RichTaskProgress:
+    def __init__(
+        self,
+        reporter: RichProgressReporter,
+        task_id: TaskID,
+        logger: logging.Logger,
+    ) -> None:
+        self._reporter: RichProgressReporter = reporter
+        self.task_id: TaskID = task_id
+        self._logger: logging.Logger = logger
+        self.completed: int = 0
+
+    def step(self, label: str) -> None:
+        self._reporter._step_task(self.task_id, label)
+
+    def advance(self, n: int) -> None:
+        self._reporter._advance_task(self, n)
+
+    def log(self, message: str, level: int) -> None:
+        self._logger.log(level, "%s", message)
+
+
+class RichProgressReporter:
+    """Rich-backed reporter stacking active and concurrent tasks cleanly.
+
+    Uses manual throttled refreshes (auto_refresh=False) so no background
+    thread is spawned, preserving ProcessTaskExecutor's POSIX fork() safety.
+    """
+
+    def __init__(
+        self,
+        console: Console | None = None,
+        logger: logging.Logger | None = None,
+    ) -> None:
+        self.console: Console = console if console is not None else Console()
+        self.logger: logging.Logger = (
+            logger if logger is not None else logging.getLogger(__name__)
+        )
+        self._lock: threading.Lock = threading.Lock()
+        self._explicit_depth: int = 0
+        self._active_tasks: int = 0
+        self._started: bool = False
+        self._last_refresh: float = 0.0
+        self._progress: Progress = Progress(
+            SpinnerColumn(finished_text="[green]✓[/green]"),
+            TextColumn(
+                "[progress.description]{task.description}",
+                table_column=Column(
+                    no_wrap=True, overflow="ellipsis", max_width=34
+                ),
+            ),
+            BarColumn(
+                bar_width=None,
+                table_column=Column(min_width=12, ratio=2),
+            ),
+            MofNCompleteColumn(
+                table_column=Column(no_wrap=True, justify="right")
+            ),
+            TextColumn("{task.fields[unit]}", table_column=Column(no_wrap=True)),
+            TimeElapsedColumn(table_column=Column(no_wrap=True)),
+            TextColumn(
+                "{task.fields[step]}",
+                style="dim",
+                table_column=Column(
+                    no_wrap=True, overflow="ellipsis", min_width=0, ratio=1
+                ),
+            ),
+            console=self.console,
+            auto_refresh=False,
+            transient=False,
+            redirect_stdout=False,
+            redirect_stderr=False,
+            expand=True,
+        )
+
+    def _start_locked(self) -> None:
+        if not self._started:
+            self._progress.start()
+            self._started = True
+
+    def _stop_if_idle_locked(self) -> None:
+        if (
+            self._explicit_depth == 0
+            and self._active_tasks == 0
+            and self._started
+        ):
+            self._progress.stop()
+            for task in list(self._progress.tasks):
+                self._progress.remove_task(task.id)
+            self._started = False
+            self._last_refresh = 0.0
+
+    def _refresh_locked(self, force: bool = False) -> None:
+        now = time.monotonic()
+        if force or (now - self._last_refresh) >= _REFRESH_INTERVAL_SECONDS:
+            self._progress.refresh()
+            self._last_refresh = now
+
+    def __enter__(self) -> RichProgressReporter:
+        with self._lock:
+            self._explicit_depth += 1
+            self._start_locked()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        with self._lock:
+            self._explicit_depth = max(0, self._explicit_depth - 1)
+            self._stop_if_idle_locked()
+
+    def _step_task(self, task_id: TaskID, label: str) -> None:
+        with self._lock:
+            self._progress.update(task_id, step=escape(label))
+            self._refresh_locked()
+
+    def _advance_task(self, handle: _RichTaskProgress, n: int) -> None:
+        with self._lock:
+            handle.completed += n
+            self._progress.update(handle.task_id, advance=n)
+            self._refresh_locked()
+
+    @contextmanager
+    def task(
+        self,
+        description: str,
+        total: int | None,
+        unit: str,
+    ) -> Iterator[TaskProgress]:
+        with self._lock:
+            self._active_tasks += 1
+            self._start_locked()
+            task_id = self._progress.add_task(
+                escape(description),
+                total=total,
+                unit=escape(unit),
+                step="",
+            )
+            self._refresh_locked(force=True)
+
+        handle = _RichTaskProgress(self, task_id, self.logger)
+        failed = False
+        try:
+            yield handle
+        except BaseException:
+            failed = True
+            raise
+        finally:
+            with self._lock:
+                if not failed:
+                    if total is None:
+                        self._progress.update(
+                            task_id,
+                            total=handle.completed,
+                            completed=handle.completed,
+                            step="",
+                        )
+                    elif handle.completed >= total:
+                        self._progress.update(
+                            task_id,
+                            completed=handle.completed,
+                            step="",
+                        )
+                self._progress.stop_task(task_id)
+                self._refresh_locked(force=True)
+                self._active_tasks -= 1
+                self._stop_if_idle_locked()

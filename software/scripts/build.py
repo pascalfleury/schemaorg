@@ -12,6 +12,8 @@ from pathlib import Path
 import shutil
 import sys
 
+from rich.console import Console
+
 from schemaorg import constants
 from schemaorg.executor import (
     ProcessTaskExecutor,
@@ -28,7 +30,11 @@ from schemaorg.layout import (
     Releases,
     checkDataDirectories,
 )
-from schemaorg.progress import LogProgressReporter, ProgressReporter
+from schemaorg.progress import (
+    ProgressReporter,
+    RichProgressReporter,
+    configure_rich_logging,
+)
 from schemaorg.site_bundle import SiteBundle
 from schemaorg.tasks.export_release_files import ExportReleaseFilesTask
 from schemaorg.tasks.export_site_metadata import ExportSiteMetadataTask
@@ -42,7 +48,6 @@ from schemaorg.tasks.validate_examples import (
 )
 from schemaorg.version import Version
 from SchemaExamples.schemaexamples import SchemaExamples
-import util.pretty_logger as pretty_logger
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -208,6 +213,12 @@ def run_build(
         site_out = unified_out
         releases_in = unified_out if options.schema else input_layout
 
+    stage_count = sum(
+        (options.schema, options.tests, options.validate, options.site)
+    )
+    if stage_count == 0:
+        return 0
+
     is_partial_site = bool(options.terms or options.pages)
     if options.clean and (
         options.site or (options.output_dir is not None and options.schema)
@@ -215,128 +226,146 @@ def run_build(
         # Clean once before Stage 1 so unified -o never wipes freshly built releases/.
         _clear_dir(site_out.output_dir)
 
-    if options.schema:
-        ExportReleaseFilesTask(
-            input_layout=input_layout,
-            output_layout=releases_out,
-            version=target,
-            progress=progress,
-            executor=cpu_executor,
-        ).run()
-
-    if options.tests:
-        summary = RunUnitTestsTask(
-            tests_dir=tests_dir,
-            skip_basics=False,
-            progress=progress,
-            executor=cpu_executor,
-        ).run()
-        if not summary.ok:
-            failures = (
-                summary.failure_count
-                + summary.error_count
-                + summary.unexpected_success_count
-            )
-            log.error("Unit tests failed (%d errors/failures)", failures)
-            return 1
-
-    if options.validate:
-        examples = SchemaExamples.from_layout(input_layout)
-        jsonld_examples = [
-            ex for ex in examples.allExamples() if ex.hasJsonld()
-        ]
-        try:
-            val_summary = ValidateExamplesTask(
-                releases=Releases(releases_in, version_registry),
+    with progress.task(
+        f"Building {constants.SITENAME} ({target.number()})",
+        total=stage_count,
+        unit="stages",
+    ) as overall:
+        if options.schema:
+            overall.step("schema")
+            ExportReleaseFilesTask(
+                input_layout=input_layout,
+                output_layout=releases_out,
                 version=target,
-                examples=jsonld_examples,
-                invalid_only=True,
-                source_output=False,
                 progress=progress,
                 executor=cpu_executor,
             ).run()
-        except ShaclConfigError as exc:
-            log.error("SHACL validation configuration error: %s", exc)
-            return os.EX_CONFIG
-        if val_summary.error_count:
-            log.error(
-                "SHACL validation failed (%d invalid examples)",
-                val_summary.error_count,
-            )
-            return 1
+            overall.advance(1)
 
-    if options.site:
-        bundle = SiteBundle.from_release(
-            input_layout=input_layout,
-            releases_layout=releases_in,
-            target_version=target,
-            progress=progress,
-            executor=io_executor,
-        )
-        PrepareSiteStaticTask(
-            input_layout=input_layout,
-            output_layout=site_out,
-            target_version=target,
-            current_version=bundle.current_version,
-            clear_first=False,
-            progress=progress,
-            executor=io_executor,
-        ).run()
+        if options.tests:
+            overall.step("tests")
+            summary = RunUnitTestsTask(
+                tests_dir=tests_dir,
+                skip_basics=False,
+                progress=progress,
+                executor=cpu_executor,
+            ).run()
+            if not summary.ok:
+                failures = (
+                    summary.failure_count
+                    + summary.error_count
+                    + summary.unexpected_success_count
+                )
+                log.error("Unit tests failed (%d errors/failures)", failures)
+                return 1
+            overall.advance(1)
 
-        if is_partial_site:
-            term_ids = options.terms
-            page_names = options.pages
-        else:
-            term_ids = ("ALL",)
-            page_names = ("ALL",)
+        if options.validate:
+            overall.step("validate")
+            examples = SchemaExamples.from_layout(input_layout)
+            jsonld_examples = [
+                ex for ex in examples.allExamples() if ex.hasJsonld()
+            ]
+            try:
+                val_summary = ValidateExamplesTask(
+                    releases=Releases(releases_in, version_registry),
+                    version=target,
+                    examples=jsonld_examples,
+                    invalid_only=False,
+                    source_output=False,
+                    progress=progress,
+                    executor=cpu_executor,
+                ).run()
+            except ShaclConfigError as exc:
+                log.error("SHACL validation configuration error: %s", exc)
+                return os.EX_CONFIG
+            if val_summary.error_count:
+                log.error(
+                    "SHACL validation failed (%d invalid examples)",
+                    val_summary.error_count,
+                )
+                return 1
+            overall.advance(1)
 
-        RenderTermPagesTask(
-            bundle=bundle,
-            output_layout=site_out,
-            build_opts=(),
-            term_ids=term_ids,
-            progress=progress,
-            executor=cpu_executor,
-        ).run()
+        if options.site:
+            overall.step("site")
+            site_prep = io_executor.run_all([
+                lambda: SiteBundle.from_release(
+                    input_layout=input_layout,
+                    releases_layout=releases_in,
+                    target_version=target,
+                    progress=progress,
+                    executor=io_executor,
+                ),
+                lambda: PrepareSiteStaticTask(
+                    input_layout=input_layout,
+                    output_layout=site_out,
+                    target_version=target,
+                    current_version=version_registry.current(),
+                    clear_first=False,
+                    progress=progress,
+                    executor=io_executor,
+                ).run(),
+            ])
+            bundle = site_prep[0]
+            assert isinstance(bundle, SiteBundle)
 
-        RenderDocsPagesTask(
-            bundle=bundle,
-            output_layout=site_out,
-            build_opts=(),
-            page_names=page_names,
-            progress=progress,
-            executor=cpu_executor,
-        ).run()
+            if is_partial_site:
+                term_ids = options.terms
+                page_names = options.pages
+            else:
+                term_ids = ("ALL",)
+                page_names = ("ALL",)
 
-        ExportSiteMetadataTask(
-            input_layout=input_layout,
-            output_layout=site_out,
-            version=target,
-            vocab=bundle.vocab,
-            progress=progress,
-            executor=cpu_executor,
-            releases_layout=releases_in,
-        ).run()
+            RenderTermPagesTask(
+                bundle=bundle,
+                output_layout=site_out,
+                build_opts=(),
+                term_ids=term_ids,
+                progress=progress,
+                executor=cpu_executor,
+            ).run()
+
+            RenderDocsPagesTask(
+                bundle=bundle,
+                output_layout=site_out,
+                build_opts=(),
+                page_names=page_names,
+                progress=progress,
+                executor=cpu_executor,
+            ).run()
+
+            ExportSiteMetadataTask(
+                input_layout=input_layout,
+                output_layout=site_out,
+                version=target,
+                vocab=bundle.vocab,
+                progress=progress,
+                executor=cpu_executor,
+                releases_layout=releases_in,
+            ).run()
+            overall.advance(1)
 
     return 0
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO)
-    pretty_logger.MakeRootLogPretty()
+    console = Console()
+    configure_rich_logging(console, level=logging.WARNING)
     options = parse_args(argv)
     checkDataDirectories()
 
     cpu_executor, io_executor = _make_executors(options.jobs)
-    exit_code = run_build(
-        options=options,
-        input_layout=InputLayout(constants.PROJECT_ROOT),
-        default_site_dir=constants.PROJECT_ROOT / "software/site",
-        tests_dir=constants.PROJECT_ROOT / "software/tests",
-        progress=LogProgressReporter(logger=log, log_steps=False),
-        cpu_executor=cpu_executor,
-        io_executor=io_executor,
-    )
+    with RichProgressReporter(console=console) as progress:
+        exit_code = run_build(
+            options=options,
+            input_layout=InputLayout(constants.PROJECT_ROOT),
+            default_site_dir=constants.PROJECT_ROOT / "software/site",
+            tests_dir=constants.PROJECT_ROOT / "software/tests",
+            progress=progress,
+            cpu_executor=cpu_executor,
+            io_executor=io_executor,
+        )
     if exit_code:
         sys.exit(exit_code)
 

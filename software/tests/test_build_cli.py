@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
 
-from schemaorg.executor import SequentialExecutor, default_worker_count
+from rich.console import Console
+
+from schemaorg import constants
+from schemaorg.executor import (
+    SequentialExecutor,
+    ThreadTaskExecutor,
+    default_worker_count,
+)
 from schemaorg.layout import Domain, InputLayout
-from schemaorg.progress import NullProgressReporter
+from schemaorg.progress import NullProgressReporter, RichProgressReporter
 import scripts.build as build_cli
 
 _MINI_TTL = """
@@ -300,6 +308,37 @@ class TestBuildCliExecution(unittest.TestCase):
                     io_executor=seq,
                 )
             self.assertEqual(rc, os.EX_CONFIG)
+
+    def test_rich_progress_renders_stacked_stages_with_parallel_io(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            out_dir = Path(tmp) / "out"
+            default_site, tests_dir = _create_mini_repo(root)
+            buf = io.StringIO()
+            console = Console(file=buf, force_terminal=False, width=110)
+
+            opts = build_cli.parse_args(["-o", str(out_dir), "-j", "2"])
+            with RichProgressReporter(console=console) as progress:
+                rc = build_cli.run_build(
+                    options=opts,
+                    input_layout=InputLayout(root),
+                    default_site_dir=default_site,
+                    tests_dir=tests_dir,
+                    progress=progress,
+                    cpu_executor=SequentialExecutor(),
+                    io_executor=ThreadTaskExecutor(2),
+                )
+
+            self.assertEqual(rc, 0)
+            rendered = buf.getvalue()
+            self.assertIn(f"Building {constants.SITENAME} (next)", rendered)
+            self.assertIn("4/4", rendered)
+            self.assertIn("Exporting release files (next)", rendered)
+            self.assertIn("Running unit tests", rendered)
+            self.assertIn("Validating 1 JSON-LD examples", rendered)
+            self.assertIn("Loading site bundle (next)", rendered)
+            self.assertIn("Preparing static site files", rendered)
+            self.assertIn("Rendering term pages", rendered)
 
 
 if __name__ == "__main__":
