@@ -1,0 +1,27 @@
+<tr>
+  <td class="release">{{ data.next_version }}<br/>{{ data.release_date }}</td>
+  <td>
+  <span id="v{{ data.next_version }}"></span>
+  <p>
+  Version {{ data.next_version }} - Schema, documentation, and infrastructure updates.</p>
+  </td>
+  <td>
+  <ul>
+{% for c in data.changes.schema_commits %}
+{% if c.pr_number %}
+    <li id="g{{ c.pr_number }}">
+      <a href="{{ data.repo_url }}/pull/{{ c.pr_number }}">PR #{{ c.pr_number }}</a>: {{ c.clean_subject }}
+    </li>
+{% else %}
+    <li>{{ c.clean_subject }}</li>
+{% endif %}
+{% endfor %}
+{% if data.changes.infra_commits %}
+    <li>Infrastructure, build, and documentation updates{% if data.infra_pr_numbers %} ({% for pr in data.infra_pr_numbers %}<a href="{{ data.repo_url }}/pull/{{ pr }}">PR #{{ pr }}</a>{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}.</li>
+{% endif %}
+{% if not data.changes.schema_commits and not data.changes.infra_commits %}
+    <li>Miscellaneous schema and site updates.</li>
+{% endif %}
+  </ul>
+  </td>
+</tr>

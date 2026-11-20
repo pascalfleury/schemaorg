@@ -43,6 +43,24 @@ class VersionItem:
     def date(self) -> str | None:
         return self._date
 
+    def _major_minor(self) -> tuple[int, int]:
+        if self.is_next():
+            raise ValueError(f"Cannot increment unreleased version '{NEXT_VERSION}'")
+        parts = self._number.split(".")
+        if len(parts) != 2 or not all(p.isdigit() for p in parts):
+            raise ValueError(f"Expected 'MAJOR.MINOR' version, got {self._number!r}")
+        return int(parts[0]), int(parts[1])
+
+    def next_minor(self) -> str:
+        """Return next minor version string (e.g. '30.1' -> '30.2')."""
+        major, minor = self._major_minor()
+        return f"{major}.{minor + 1}"
+
+    def next_major(self) -> str:
+        """Return next major version string (e.g. '30.1' -> '31.0')."""
+        major, _ = self._major_minor()
+        return f"{major + 1}.0"
+
     def __str__(self) -> str:
         return self._number
 

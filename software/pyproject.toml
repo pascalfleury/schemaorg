@@ -21,6 +21,7 @@ dependencies = [
     "pyshacl>=0.31.0",
     "rdflib>=7.6.0",
     "requests>=2.32.5",
+    "rich>=15.0.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +32,7 @@ dev = [
 
 [project.scripts]
 build = "scripts.build:main"
+release = "scripts.release:main"
 build_site = "scripts.buildsite:main"
 build_schema = "scripts.buildfiles:main"
 build_term_list = "scripts.buildtermlist:main"
@@ -40,3 +42,6 @@ dev_server = "scripts.devserv:main"
 
 [tool.setuptools]
 packages = { find = { where = ["."], include = ["*"], exclude = ["gcloud*", "site*", "tests*"] } }
+
+[tool.setuptools.package-data]
+"schemaorg.release" = ["templates/*.j2"]

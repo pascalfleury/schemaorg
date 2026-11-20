@@ -1,0 +1,91 @@
+# {{ data.sitename }} Release {{ data.next_version }} Changelog Brief
+
+## Context
+- **Repository:** {{ data.repo_url }}
+- **Release:** {{ data.next_version }} (previous: {{ data.previous_version }})
+- **Release date:** {{ data.release_date }}
+- **Commit range:** `{{ data.changes.baseline_sha }}..{{ data.changes.head_sha }}`
+- **Audience:** {{ data.sitename }} vocabulary users and implementers. Prioritize
+  semantic vocabulary changes (new/updated types, properties, enum values,
+  examples). Summarize infrastructure/tooling changes concisely.
+
+## Target HTML Row Format (`docs/releases.html`)
+```html
+<tr>
+  <td class="release">{{ data.next_version }}<br/>{{ data.release_date }}</td>
+  <td>
+  <span id="v{{ data.next_version }}"></span>
+  <p>
+  Version {{ data.next_version }} - One-to-two sentence summary of headline
+  schema additions plus a brief nod to tooling/doc updates.</p>
+  </td>
+  <td>
+  <ul>
+    <li id="g1234">
+      <a href="{{ data.repo_url }}/pull/1234">PR #1234</a>:
+      Add enum value <a href="/ExampleTerm">ExampleTerm</a> to
+      <a href="/ParentType">ParentType</a>.
+    </li>
+  </ul>
+  </td>
+</tr>
+```
+{% if data.vocab_delta %}
+
+## Vocabulary Term Diff (`CompareVocabularyTask`)
+- Terms: {{ data.vocab_delta.previous_count }} -> {{ data.vocab_delta.current_count }} (+{{ data.vocab_delta.added | length }} added, -{{ data.vocab_delta.dropped | length }} dropped, {{ data.vocab_delta.changed_count }} changed)
+{% if data.vocab_delta.added %}
+- Added terms: {{ data.vocab_delta.added | join(", ") }}
+{% endif %}
+{% if data.vocab_delta.dropped %}
+- Dropped terms: {{ data.vocab_delta.dropped | join(", ") }}
+{% endif %}
+{% if data.vocab_delta.report_lines %}
+```text
+{% for line in data.vocab_delta.report_lines %}
+{{ line }}
+{% endfor %}
+{% if data.vocab_delta.truncated_count %}
+... ({{ data.vocab_delta.truncated_count }} more lines truncated)
+{% endif %}
+```
+{% endif %}
+{% endif %}
+
+## Group 1: Schema & Examples Changes (`data/...`, {{ data.changes.schema_commits | length }} commits)
+{% if data.changes.schema_commits %}
+{% for c in data.changes.schema_commits %}
+- `{{ c.sha }}`{% if c.pr_number %} [PR #{{ c.pr_number }}]({{ data.repo_url }}/pull/{{ c.pr_number }}){% endif %}{% if c.is_mixed %} [mixed]{% endif %}: {{ c.subject }}
+{% if c.data_files %}
+  Files: {{ c.data_files[:6] | join(", ") }}{% if c.data_files | length > 6 %}, ... (+{{ c.data_files | length - 6 }} more){% endif %}
+
+{% endif %}
+{% if c.first_body_line %}
+  Note: {{ c.first_body_line }}
+{% endif %}
+{% endfor %}
+{% else %}
+- *(No schema/data commits in this range.)*
+{% endif %}
+
+## Group 2: Infrastructure & Tooling Changes (`software/...`, {{ data.changes.infra_commits | length }} commits)
+{% if data.changes.infra_commits %}
+{% for c in data.changes.infra_commits %}
+- `{{ c.sha }}`{% if c.pr_number %} [PR #{{ c.pr_number }}]({{ data.repo_url }}/pull/{{ c.pr_number }}){% endif %}{% if c.is_mixed %} [mixed]{% endif %}: {{ c.subject }}
+{% if c.first_body_line %}
+  Note: {{ c.first_body_line }}
+{% endif %}
+{% endfor %}
+{% else %}
+- *(No infrastructure/tooling commits in this range.)*
+{% endif %}
+
+## Instructions
+1. Produce a single well-formed HTML `<tr>...</tr>` block matching the
+   format above, ready to paste directly into `docs/releases.html`.
+2. Group related PRs into a single `<li>` item where appropriate; use
+   `<a href="{{ data.repo_url }}/pull/NNNN">PR #NNNN</a>` for PR links and
+   `<a href="/TermName">TermName</a>` for {{ data.sitename }} terms.
+3. Highlight Group 1 (schema/vocabulary semantics) using exact term names
+   from the Vocabulary Term Diff. Roll Group 2 (infrastructure/tooling)
+   into one or two concise bullets.
