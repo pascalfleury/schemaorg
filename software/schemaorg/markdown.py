@@ -53,17 +53,5 @@ class MarkdownTool:
             source,
         )
 
-    @classmethod
-    def setWikilinkCssClass(cls, c: str) -> None:
-        cls.WCLASS = c
-
-    @classmethod
-    def setWikilinkPrePath(cls, p: str) -> None:
-        cls.WPRE = p
-
-    @classmethod
-    def setWikilinkPostPath(cls, p: str) -> None:
-        cls.WPOST = p
-
 
 Markdown: MarkdownTool = MarkdownTool()

@@ -6,16 +6,9 @@ diff. ``CustomTurtleSerializer`` emits classes first, then properties, each
 lexicographically sorted, then everything else. That ordering is what makes
 the hand-maintained vocabulary files reviewable: a one-term change produces
 a one-term diff.
-
-Registration is **explicit**. The previous incarnation of this code called
-``register()`` at import time, silently replacing rdflib's global ``turtle``
-serialiser for every graph in the process — including graphs that had
-nothing to do with schema.org. A caller that wants deterministic Turtle now
-says so.
 """
 
 from rdflib import BNode, RDF, RDFS
-from rdflib.plugin import Serializer, register
 from rdflib.plugins.serializers.turtle import TurtleSerializer
 import rdflib.term
 
@@ -23,7 +16,7 @@ import rdflib.term
 class CustomTurtleSerializer(TurtleSerializer):
     """Turtle serialiser with a human-reviewable subject order."""
 
-    topClasses = (RDFS.Class, RDF.Property)
+    topClasses = [RDFS.Class, RDF.Property]
 
     def orderSubjects(self) -> list[rdflib.term.Node]:
         seen = set()
@@ -31,7 +24,9 @@ class CustomTurtleSerializer(TurtleSerializer):
 
         # Emit classes and properties first, sorted lexicographically.
         for classURI in self.topClasses:
-            members = sorted(self.store.subjects(RDF.type, classURI))
+            members = sorted(
+                self.store.subjects(RDF.type, classURI)  # type: ignore[type-var]
+            )
             subjects.extend(members)
             for member in members:
                 self._topLevels[member] = True
@@ -46,13 +41,3 @@ class CustomTurtleSerializer(TurtleSerializer):
         subjects.extend(subject for _, subject in recursable)
 
         return subjects
-
-
-def register_as_turtle() -> None:
-    """Makes ``format="turtle"`` deterministic for the whole process.
-
-    This is global and irreversible within a process: it replaces rdflib's
-    registered ``turtle`` serialiser. Call it from a CLI entry point, never
-    from library code.
-    """
-    register("turtle", Serializer, __name__, CustomTurtleSerializer.__name__)

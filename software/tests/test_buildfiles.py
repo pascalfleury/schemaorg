@@ -28,8 +28,18 @@ from schemaorg.renderers import (
     uriwrap,
 )
 from schemaorg.site_bundle import SiteBundle
+from schemaorg.tasks.export_release_files import (
+    Artifact,
+    ExportReleaseFilesTask,
+    export_release_unscoped,
+    export_scoped,
+    write_artifact,
+)
+from schemaorg.tasks.export_site_metadata import (
+    ExportSiteMetadataTask,
+    plan_site_docs,
+)
 from schemaorg.version import Version, VersionItem
-import scripts.buildfiles as buildfiles
 
 FIXTURE_TTL = """
 @prefix : <https://schema.org/> .
@@ -90,8 +100,8 @@ class TestPostProcess(unittest.TestCase):
     def testWriteArtifactAppliesPostProcessorsInOrder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "out.txt"
-            buildfiles.write_artifact(
-                buildfiles.Artifact(
+            write_artifact(
+                Artifact(
                     "x",
                     path,
                     lambda: "https://schema.org/Thing",
@@ -214,10 +224,14 @@ class TestRenderers(unittest.TestCase):
                     ttl_text, encoding="utf-8"
                 )
                 out_layout = OutputLayout(in_dir / "data")
-                buildfiles.export_release_files(InputLayout(in_dir), out_layout)
-                rel_dir = Releases(
-                    out_layout, Version(in_dir / "versions.json")
-                ).dir("next")
+                version_obj = Version(in_dir / "versions.json")
+                ExportReleaseFilesTask(
+                    input_layout=InputLayout(in_dir),
+                    output_layout=out_layout,
+                    version=version_obj.next(),
+                    progress=NullProgressReporter(),
+                ).run()
+                rel_dir = Releases(out_layout, version_obj).dir("next")
                 outputs[label] = {
                     p.name: p.read_text(encoding="utf-8")
                     for p in rel_dir.iterdir()
@@ -322,14 +336,10 @@ class TestRenderers(unittest.TestCase):
         self.assertIn(renderer.json(), renderer.jsonp())
 
     def testOwlRendererHandlesNextWithoutDate(self) -> None:
-        prev_wpre = markdown.MarkdownTool.WPRE
-        self.addCleanup(markdown.MarkdownTool.setWikilinkPrePath, prev_wpre)
-        markdown.MarkdownTool.setWikilinkPrePath("https://schema.org/")
-
         dated = OwlRenderer(
             self.all_graph, VersionItem("30.1", "2026-09-16")
         ).render()
-        self.assertEqual(markdown.MarkdownTool.WPRE, "https://schema.org/")
+        self.assertEqual(markdown.MarkdownTool.WPRE, "/")
         self.assertIn("released: 2026-09-16", dated)
         self.assertIn("dcterms:modified", dated)
         self.assertIn('href="/Thing"', dated)
@@ -384,16 +394,16 @@ class TestPlan(unittest.TestCase):
             vocab = VocabularyLoader(all_graph, version=next_version).load()
             csv = CsvRenderer(vocab)
 
-            all_scoped = buildfiles.export_scoped(
+            all_scoped = export_scoped(
                 Scope.ALL, all_graph, csv, next_version, releases
             )
-            current_scoped = buildfiles.export_scoped(
+            current_scoped = export_scoped(
                 Scope.CURRENT, current_graph, csv, next_version, releases
             )
-            release_unscoped = buildfiles.export_release_unscoped(
+            release_unscoped = export_release_unscoped(
                 all_graph, vocab, next_version, releases, ()
             )
-            site_docs = buildfiles.plan_site_docs(
+            site_docs = plan_site_docs(
                 vocab, next_version, releases, site_layout
             )
             self.assertEqual(len(all_scoped), 14)
@@ -453,16 +463,18 @@ class TestPlan(unittest.TestCase):
             stale = release_out_layout.file(Domain.RELEASE, "next/stale.txt")
             stale.write_text("obsolete", encoding="utf-8")
 
-            buildfiles.export_release_files(
-                input_layout=input_layout, output_layout=release_out_layout
-            )
+            version_obj = Version(in_dir / "versions.json")
+            ExportReleaseFilesTask(
+                input_layout=input_layout,
+                output_layout=release_out_layout,
+                version=version_obj.next(),
+                progress=NullProgressReporter(),
+            ).run()
 
             self.assertFalse((in_dir / "data" / "docs").exists())
             self.assertFalse(stale.exists())
 
-            releases = Releases(
-                release_out_layout, Version(in_dir / "versions.json")
-            )
+            releases = Releases(release_out_layout, version_obj)
             self.assertEqual(len(list(releases.dir("next").iterdir())), 35)
             self.assertTrue(releases.file(filename="httpequivs.ttl").is_file())
             for name in (
@@ -493,9 +505,19 @@ class TestPlan(unittest.TestCase):
             self.assertNotIn("https://schema.org", http_nt)
             self.assertEqual(protocol_swap()(https_nt), http_nt)
 
-            buildfiles.export_site_docs(
-                input_layout=input_layout, output_layout=site_out_layout
+            bundle = SiteBundle.from_release(
+                input_layout=input_layout,
+                releases_layout=input_layout,
+                target_version=version_obj.next(),
+                progress=NullProgressReporter(),
             )
+            ExportSiteMetadataTask(
+                input_layout=input_layout,
+                output_layout=site_out_layout,
+                version=version_obj.next(),
+                vocab=bundle.vocab,
+                progress=NullProgressReporter(),
+            ).run()
             for name in (
                 "jsoncounts.json",
                 "jsonpcounts.js",
@@ -519,11 +541,12 @@ class TestPlan(unittest.TestCase):
                 ).read_text(encoding="utf-8"),
             )
 
-            buildfiles.export_release_files(
+            ExportReleaseFilesTask(
                 input_layout=input_layout,
                 output_layout=release_out_layout,
-                version="30.1",
-            )
+                version=version_obj.resolve("30.1"),
+                progress=NullProgressReporter(),
+            ).run()
             self.assertTrue(
                 releases.file("30.1", filename="schemaorg.owl").is_file()
             )
@@ -531,9 +554,6 @@ class TestPlan(unittest.TestCase):
     def testStage1ReleaseExportDoesNotLeakStateIntoStage2SiteBuild(
         self,
     ) -> None:
-        prev_wpre = markdown.MarkdownTool.WPRE
-        self.addCleanup(markdown.MarkdownTool.setWikilinkPrePath, prev_wpre)
-
         with tempfile.TemporaryDirectory() as tmp:
             in_dir = Path(tmp) / "in"
             (in_dir / "data").mkdir(parents=True)
@@ -554,11 +574,12 @@ class TestPlan(unittest.TestCase):
             release_out_layout = OutputLayout(in_dir / "data")
             version_obj = Version(in_dir / "versions.json")
 
-            markdown.MarkdownTool.setWikilinkPrePath("/")
-
-            buildfiles.export_release_files(
-                input_layout=input_layout, output_layout=release_out_layout
-            )
+            ExportReleaseFilesTask(
+                input_layout=input_layout,
+                output_layout=release_out_layout,
+                version=version_obj.next(),
+                progress=NullProgressReporter(),
+            ).run()
 
             self.assertEqual(markdown.MarkdownTool.WPRE, "/")
 
