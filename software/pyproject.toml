@@ -30,6 +30,7 @@ dev = [
 ]
 
 [project.scripts]
+build = "scripts.build:main"
 build_site = "scripts.buildsite:main"
 build_schema = "scripts.buildfiles:main"
 build_term_list = "scripts.buildtermlist:main"

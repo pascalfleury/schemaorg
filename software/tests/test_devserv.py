@@ -104,6 +104,35 @@ class TestDevservVersionRoutes(unittest.TestCase):
         with self.client.get("/version/99.9/schemaorg-all-https.ttl") as resp:
             self.assertEqual(resp.status_code, 404)
 
+    def test_configure_app_dir_overlays_releases_and_falls_back(self) -> None:
+        custom_dir = self.root / "custom_build"
+        (custom_dir / "docs").mkdir(parents=True)
+        (custom_dir / "docs" / "home.html").write_text(
+            "<html>custom home</html>", encoding="utf-8"
+        )
+        custom_next = custom_dir / "releases" / "next"
+        custom_next.mkdir(parents=True)
+        (custom_next / "schemaorg-all-https.ttl").write_text(
+            "# custom next ttl\n", encoding="utf-8"
+        )
+
+        devserv.configure_app(site_dir=custom_dir)
+
+        with self.client.get("/") as resp:
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(
+                resp.get_data(as_text=True), "<html>custom home</html>"
+            )
+        with self.client.get("/version/next/schemaorg-all-https.ttl") as resp:
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.get_data(as_text=True), "# custom next ttl\n")
+        # Historical release not in custom_dir falls back to data/releases/.
+        with self.client.get("/version/15.0/") as resp:
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(
+                resp.get_data(as_text=True), "<html>legacy 15.0</html>"
+            )
+
 
 class TestHandlersTemplateRouting(unittest.TestCase):
     @staticmethod

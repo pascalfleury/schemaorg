@@ -102,7 +102,17 @@ def serve_downloads(ver: str, path: str = "") -> Response:
         resolved = releases.resolve(ver)
     except ValueError:
         abort(404)
-    release_dir = releases.dir(resolved)
+    static_root = Path(app.static_folder) if app.static_folder else None
+    overlay_dir = (
+        static_root / Domain.RELEASE.value / str(resolved)
+        if static_root is not None
+        else None
+    )
+    release_dir = (
+        overlay_dir
+        if overlay_dir is not None and overlay_dir.is_dir()
+        else releases.dir(resolved)
+    )
     if not path:
         if (release_dir / "schema-all.html").is_file():
             print(f"Serving release file: {release_dir / 'schema-all.html'}")
@@ -113,10 +123,24 @@ def serve_downloads(ver: str, path: str = "") -> Response:
     return send_from_directory(release_dir, path)
 
 
+def configure_app(site_dir: Path, production: bool = False) -> None:
+    """Configure static folder and production mode for Flask."""
+    app.config["PRODUCTION"] = production
+    app.static_folder = str(site_dir.resolve())
+
+
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Local dev server for Schema.org.")
-    parser.add_argument("--host", default="localhost", help="Host (default: localhost)")
-    parser.add_argument("--port", type=int, default=8080, help="Port (default: 8080)")
+    parser = argparse.ArgumentParser(
+        description=f"Local dev server for {constants.SITENAME}."
+    )
+    parser.add_argument("--host", default="localhost", help="Host (default: %(default)s)")
+    parser.add_argument("--port", type=int, default=8080, help="Port (default: %(default)s)")
+    parser.add_argument(
+        "--dir",
+        type=Path,
+        default=constants.PROJECT_ROOT / "software/site",
+        help="Site directory to serve (default: %(default)s)",
+    )
     parser.add_argument(
         "--production",
         action="store_true",
@@ -124,10 +148,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     args_parsed = parser.parse_args(argv)
 
-    app.config["PRODUCTION"] = args_parsed.production
+    configure_app(site_dir=args_parsed.dir, production=args_parsed.production)
 
     print(
-        f"Local dev server for Schema.org (default: 'next', latest release: "
+        f"Local dev server for {constants.SITENAME} (default: 'next', latest release: "
         f"{VERSION.current().number()})"
     )
     print(f"Serving files from {app.static_folder}")

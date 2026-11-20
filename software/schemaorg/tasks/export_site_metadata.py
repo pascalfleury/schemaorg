@@ -75,6 +75,7 @@ class ExportSiteMetadataTask:
         vocab: Vocabulary,
         progress: ProgressReporter,
         executor: TaskExecutor,
+        releases_layout: InputLayout | OutputLayout | None = None,
     ) -> None:
         self.input_layout: InputLayout = input_layout
         self.output_layout: OutputLayout = output_layout
@@ -82,12 +83,15 @@ class ExportSiteMetadataTask:
         self.vocab: Vocabulary = vocab
         self.progress: ProgressReporter = progress
         self.executor: TaskExecutor = executor
+        self.releases_layout: InputLayout | OutputLayout = (
+            releases_layout if releases_layout is not None else input_layout
+        )
 
     def run(self) -> list[Path]:
         version_obj = Version(
             self.input_layout.file(Domain.ROOT, constants.VERSIONS_FILE)
         )
-        releases = Releases(self.input_layout, version_obj)
+        releases = Releases(self.releases_layout, version_obj)
         artifacts = plan_site_docs(
             self.vocab, self.version, releases, self.output_layout
         )
