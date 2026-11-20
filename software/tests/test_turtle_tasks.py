@@ -6,6 +6,7 @@ import unittest
 
 import rdflib
 
+from schemaorg.executor import ProcessTaskExecutor, SequentialExecutor
 from schemaorg.progress import NullProgressReporter
 from schemaorg.sdo_uri import SDO, SdoUri
 from schemaorg.tasks.turtle_tasks import (
@@ -38,6 +39,7 @@ class TestTurtleTasks(unittest.TestCase):
             files=[src],
             output=out,
             progress=NullProgressReporter(),
+            executor=SequentialExecutor(),
         ).run()
 
         self.assertEqual(written, [out])
@@ -54,6 +56,7 @@ class TestTurtleTasks(unittest.TestCase):
                 files=[a, b],
                 output=self.root / "out.ttl",
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             )
 
     def test_merge_combines_multiple_files(self) -> None:
@@ -77,6 +80,7 @@ class TestTurtleTasks(unittest.TestCase):
             files=[first, second],
             output=merged_path,
             progress=NullProgressReporter(),
+            executor=ProcessTaskExecutor(max_workers=2),
         ).run()
 
         self.assertEqual(result, merged_path)
@@ -100,6 +104,7 @@ class TestTurtleTasks(unittest.TestCase):
             output=None,
             part_of="pending",
             progress=NullProgressReporter(),
+            executor=SequentialExecutor(),
         ).run()
 
         pending_uri = SdoUri.for_layer("pending").uri
@@ -114,6 +119,7 @@ class TestTurtleTasks(unittest.TestCase):
             output=None,
             part_of="GA",
             progress=NullProgressReporter(),
+            executor=SequentialExecutor(),
         ).run()
 
         after_ga = rdflib.Graph().parse(src, format="turtle")
@@ -125,6 +131,7 @@ class TestTurtleTasks(unittest.TestCase):
                 output=None,
                 part_of="bogus",
                 progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
             )
 
 

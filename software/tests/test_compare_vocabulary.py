@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from schemaorg.executor import SequentialExecutor, ThreadTaskExecutor
 from schemaorg.layout import InputLayout
 from schemaorg.progress import NullProgressReporter
 from schemaorg.tasks.compare_vocabulary import CompareVocabularyTask
@@ -57,6 +58,7 @@ class TestCompareVocabularyTask(unittest.TestCase):
             show_names=True,
             show_triples=True,
             progress=NullProgressReporter(),
+            executor=ThreadTaskExecutor(max_workers=2),
         ).run()
 
         self.assertEqual(report.previous_count, 2)
@@ -85,6 +87,7 @@ class TestCompareVocabularyTask(unittest.TestCase):
             show_names=False,
             show_triples=False,
             progress=NullProgressReporter(),
+            executor=SequentialExecutor(),
         ).run()
         self.assertEqual(excluded.added, ("https://schema.org/NewType",))
 
@@ -97,6 +100,7 @@ class TestCompareVocabularyTask(unittest.TestCase):
             show_names=False,
             show_triples=False,
             progress=NullProgressReporter(),
+            executor=SequentialExecutor(),
         ).run()
         self.assertEqual(
             reincluded.added,

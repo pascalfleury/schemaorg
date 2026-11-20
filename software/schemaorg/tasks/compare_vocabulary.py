@@ -11,6 +11,7 @@ from rdflib import Graph, Namespace, RDF, RDFS, URIRef
 from rdflib.term import Node
 
 from schemaorg import constants
+from schemaorg.executor import TaskExecutor
 from schemaorg.graph_loader import GraphLoader
 from schemaorg.layout import Domain, InputLayout, Issues, Releases
 from schemaorg.progress import ProgressReporter
@@ -184,6 +185,7 @@ class CompareVocabularyTask:
         show_names: bool,
         show_triples: bool,
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         self.input_layout: InputLayout = input_layout
         self.previous_spec: str | None = previous_spec
@@ -193,6 +195,7 @@ class CompareVocabularyTask:
         self.show_names: bool = show_names
         self.show_triples: bool = show_triples
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def run(self) -> VocabularyDiffReport:
         with self.progress.task(
@@ -200,29 +203,34 @@ class CompareVocabularyTask:
             total=3,
             unit="steps",
         ) as p:
-            p.step("loading current graph")
-            current_graph = _filter_layers(
-                _load_spec(
-                    self.input_layout,
-                    self.current_spec,
-                    default_to_source=True,
-                ),
-                exclude=self.exclude_layers,
-                include=self.include_layers,
-            )
-            p.advance(1)
+            p.step("loading current and previous graphs")
 
-            p.step("loading previous graph")
-            previous_graph = _filter_layers(
-                _load_spec(
-                    self.input_layout,
-                    self.previous_spec,
-                    default_to_source=False,
-                ),
-                exclude=self.exclude_layers,
-                include=self.include_layers,
+            def _load_current() -> Graph:
+                return _filter_layers(
+                    _load_spec(
+                        self.input_layout,
+                        self.current_spec,
+                        default_to_source=True,
+                    ),
+                    exclude=self.exclude_layers,
+                    include=self.include_layers,
+                )
+
+            def _load_previous() -> Graph:
+                return _filter_layers(
+                    _load_spec(
+                        self.input_layout,
+                        self.previous_spec,
+                        default_to_source=False,
+                    ),
+                    exclude=self.exclude_layers,
+                    include=self.include_layers,
+                )
+
+            current_graph, previous_graph = self.executor.run_all(
+                [_load_current, _load_previous]
             )
-            p.advance(1)
+            p.advance(2)
 
             p.step("computing term and triple diffs")
             cur_terms = _terms_in_graph(current_graph)

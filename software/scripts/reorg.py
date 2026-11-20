@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 import sys
 
+from schemaorg.executor import ProcessTaskExecutor, default_worker_count
 from schemaorg.progress import LogProgressReporter
 from schemaorg.tasks.turtle_tasks import (
     AnnotateTurtleTask,
@@ -56,6 +57,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         parser.error("Cannot use --output with multiple files!")
 
     progress = LogProgressReporter(logger=log, log_steps=True)
+    executor = ProcessTaskExecutor(default_worker_count())
     input_files = [Path(f) for f in args.files]
 
     try:
@@ -65,12 +67,14 @@ def main(argv: Sequence[str] | None = None) -> None:
                 files=input_files,
                 output=output,
                 progress=progress,
+                executor=executor,
             ).run()
         elif args.command == "merge":
             MergeTurtleTask(
                 files=input_files,
                 output=Path(args.output),
                 progress=progress,
+                executor=executor,
             ).run()
         elif args.command == "annotate":
             output = Path(args.output) if args.output is not None else None
@@ -79,6 +83,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 output=output,
                 part_of=args.ispartof,
                 progress=progress,
+                executor=executor,
             ).run()
     except ValueError as exc:
         log.error("%s", exc)

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import rdflib
 
+from schemaorg.executor import TaskExecutor
 from schemaorg.progress import ProgressReporter
 from schemaorg.publish.turtle import CustomTurtleSerializer
 from schemaorg.sdo_uri import SdoUri
@@ -30,6 +31,7 @@ class LintTurtleTask:
         files: Sequence[Path],
         output: Path | None,
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         if not files:
             raise ValueError("LintTurtleTask requires at least one file.")
@@ -38,25 +40,29 @@ class LintTurtleTask:
         self.files: tuple[Path, ...] = tuple(files)
         self.output: Path | None = output
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def run(self) -> list[Path]:
+        def _lint_one(source_path: Path) -> Path:
+            target_path = (
+                self.output if self.output is not None else source_path
+            )
+            g = graph.SchemaOrgGraph([source_path])
+            _write_turtle(g, target_path)
+            if not g.IdenticalTo(graph.SchemaOrgGraph([target_path])):
+                raise ValueError(
+                    f"Linting file {source_path} lost information."
+                )
+            return target_path
+
         written: list[Path] = []
         with self.progress.task(
             "Linting Turtle files",
             total=len(self.files),
             unit="files",
         ) as p:
-            for source_path in self.files:
-                p.step(source_path.name)
-                target_path = (
-                    self.output if self.output is not None else source_path
-                )
-                g = graph.SchemaOrgGraph([source_path])
-                _write_turtle(g, target_path)
-                if not g.IdenticalTo(graph.SchemaOrgGraph([target_path])):
-                    raise ValueError(
-                        f"Linting file {source_path} lost information."
-                    )
+            for target_path in self.executor.map(_lint_one, self.files):
+                p.step(target_path.name)
                 written.append(target_path)
                 p.advance(1)
         return written
@@ -70,12 +76,14 @@ class MergeTurtleTask:
         files: Sequence[Path],
         output: Path,
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         if not files:
             raise ValueError("MergeTurtleTask requires at least one file.")
         self.files: tuple[Path, ...] = tuple(files)
         self.output: Path = output
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def run(self) -> Path:
         with self.progress.task(
@@ -89,13 +97,17 @@ class MergeTurtleTask:
             _write_turtle(merged, self.output)
 
             written = graph.SchemaOrgGraph([self.output])
-            for path in self.files:
-                p.step(path.name)
+
+            def _verify_one(path: Path) -> str:
                 if not written.FullyContains(graph.SchemaOrgGraph([path])):
                     raise ValueError(
                         f"Merging files into {self.output} lost information "
                         f"from {path}."
                     )
+                return path.name
+
+            for name in self.executor.map(_verify_one, self.files):
+                p.step(name)
                 p.advance(1)
         return self.output
 
@@ -109,6 +121,7 @@ class AnnotateTurtleTask:
         output: Path | None,
         part_of: str,
         progress: ProgressReporter,
+        executor: TaskExecutor,
     ) -> None:
         if not files:
             raise ValueError("AnnotateTurtleTask requires at least one file.")
@@ -123,29 +136,34 @@ class AnnotateTurtleTask:
         self.output: Path | None = output
         self.part_of: str = part_of
         self.progress: ProgressReporter = progress
+        self.executor: TaskExecutor = executor
 
     def run(self) -> list[Path]:
         # GA is the unannotated state.
         new_part: rdflib.URIRef | None = (
             SdoUri.for_layer(self.part_of).uri if self.part_of != "GA" else None
         )
+
+        def _annotate_one(source_path: Path) -> Path:
+            target_path = (
+                self.output if self.output is not None else source_path
+            )
+            g = graph.SchemaOrgGraph([source_path])
+            g.remove((None, graph.SCHEMAORG.isPartOf, None))
+            if new_part is not None:
+                for sub in itertools.chain(g.Types(), g.Properties()):
+                    g.add((sub, graph.SCHEMAORG.isPartOf, new_part))
+            _write_turtle(g, target_path)
+            return target_path
+
         written: list[Path] = []
         with self.progress.task(
             f"Annotating Turtle files ({self.part_of})",
             total=len(self.files),
             unit="files",
         ) as p:
-            for source_path in self.files:
-                p.step(source_path.name)
-                target_path = (
-                    self.output if self.output is not None else source_path
-                )
-                g = graph.SchemaOrgGraph([source_path])
-                g.remove((None, graph.SCHEMAORG.isPartOf, None))
-                if new_part is not None:
-                    for sub in itertools.chain(g.Types(), g.Properties()):
-                        g.add((sub, graph.SCHEMAORG.isPartOf, new_part))
-                _write_turtle(g, target_path)
+            for target_path in self.executor.map(_annotate_one, self.files):
+                p.step(target_path.name)
                 written.append(target_path)
                 p.advance(1)
         return written

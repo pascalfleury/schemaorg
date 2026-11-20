@@ -9,6 +9,7 @@ import logging
 import sys
 
 from schemaorg import constants
+from schemaorg.executor import ThreadTaskExecutor
 from schemaorg.layout import InputLayout
 from schemaorg.progress import LogProgressReporter
 from schemaorg.tasks.compare_vocabulary import CompareVocabularyTask
@@ -88,6 +89,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         show_names=args.names,
         show_triples=args.triples,
         progress=LogProgressReporter(logger=log, log_steps=False),
+        executor=ThreadTaskExecutor(max_workers=2),
     ).run()
     sys.stdout.write(report.formatted_report)
 
