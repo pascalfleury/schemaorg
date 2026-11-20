@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import unittest
 
-import util.paths as paths
-import util.stats as stats
+from schemaorg import constants
+from schemaorg.layout import InputLayout, StatsLayout
 
 
 class PublicStatsDataTests(unittest.TestCase):
     """Public statistics data files must use https:// URLs."""
 
+    layout: StatsLayout
+
     @classmethod
     def setUpClass(cls) -> None:
-        cls.layout = stats.StatsLayout(paths.DefaultInputLayout())
+        cls.layout = StatsLayout(InputLayout(constants.PROJECT_ROOT))
 
     def test_stats_csv_use_https(self) -> None:
         failures: list[str] = []

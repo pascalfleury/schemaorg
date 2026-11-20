@@ -41,7 +41,7 @@ class TestRenderTermPagesTask(unittest.TestCase):
         (templates_dir / "TermPage.j2").write_text(
             "<h1>{{ term.id }}</h1>"
             "<p>V{{ version }}</p>"
-            "{% for ex in examples %}<span>{{ ex.getKey() }}</span>{% endfor %}"
+            "{% for ex in examples %}<span>{{ ex.getKey() }}:{{ ex.getHtml() }}</span>{% endfor %}"
             "{% for b in stats_badges %}<b>{{ b.badge }}</b>{% endfor %}",
             encoding="utf-8",
         )
@@ -49,7 +49,7 @@ class TestRenderTermPagesTask(unittest.TestCase):
         data_dir = self.input_layout.dir(Domain.DATA)
         data_dir.mkdir(parents=True)
         (data_dir / "examples.txt").write_text(
-            'TYPES: #eg-7 Person\nPRE-MARKUP:\nAda\nJSON:\n{"@type": "Person"}\n',
+            'TYPES: #eg-7 Person\nPRE-MARKUP:\nAda & Grace\nJSON:\n{"@type": "Person"}\n',
             encoding="utf-8",
         )
         stats_dir = self.input_layout.dir(Domain.PUBLIC_STATS) / "commoncrawl"
@@ -96,6 +96,8 @@ class TestRenderTermPagesTask(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             term_output_path(out, "")
+        with self.assertRaises(ValueError):
+            term_output_path(out, "🟪")
 
     def test_renders_all_terms_with_examples_and_stats(self) -> None:
         logger = logging.getLogger("test.render_terms")
@@ -116,7 +118,8 @@ class TestRenderTermPagesTask(unittest.TestCase):
         )
         self.assertIn("<h1>Person</h1>", person_html)
         self.assertIn("<p>Vnext</p>", person_html)
-        self.assertIn("<span>eg-0007</span>", person_html)
+        self.assertIn("<span>eg-0007:", person_html)
+        self.assertIn("Ada &amp; Grace", person_html)
         self.assertIn("<b>10k-100k</b>", person_html)
         self.assertTrue(
             (out.output_dir / "terms/properties/n/name.html").is_file()

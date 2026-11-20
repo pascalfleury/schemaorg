@@ -7,7 +7,6 @@ import tempfile
 import unittest
 
 from schemaorg.layout import Domain, InputLayout, StatsLayout, StatsProvider
-import util.stats as legacy_stats
 
 
 class TestStatsLayout(unittest.TestCase):
@@ -124,11 +123,6 @@ class TestStatsLayout(unittest.TestCase):
         )
 
         self.assertEqual(self.layout.get_stats(providers=["empty"]), [])
-
-    def test_backward_compatibility_reexports(self) -> None:
-        self.assertIs(legacy_stats.StatsLayout, StatsLayout)
-        self.assertIs(legacy_stats.StatsProvider, StatsProvider)
-        self.assertTrue(callable(legacy_stats.get_stats_providers))
 
 
 if __name__ == "__main__":
