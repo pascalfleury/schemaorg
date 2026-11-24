@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+import logging
 from pathlib import Path
 
 from colorama import Fore, Style  # type: ignore[import-untyped]
@@ -14,6 +15,7 @@ from schemaorg import constants
 from schemaorg.layout import Domain, InputLayout, Releases
 from schemaorg.version import Version
 
+log: logging.Logger = logging.getLogger(__name__)
 VERSION: Version = Version(constants.PROJECT_ROOT / constants.VERSIONS_FILE)
 _docs: Path = Path(Domain.DOCS)
 
@@ -25,7 +27,7 @@ app: Flask = Flask(
 
 
 def _send_static(rel_path: Path | str) -> Response:
-    print(f"Serving file: {rel_path}")
+    log.info("Serving file: %s", rel_path)
     return app.send_static_file(str(rel_path))
 
 
@@ -115,11 +117,11 @@ def serve_downloads(ver: str, path: str = "") -> Response:
     )
     if not path:
         if (release_dir / "schema-all.html").is_file():
-            print(f"Serving release file: {release_dir / 'schema-all.html'}")
+            log.info("Serving release file: %s", release_dir / "schema-all.html")
             return send_from_directory(release_dir, "schema-all.html")
         return _send_static(_docs / "fullrelease.html")
 
-    print(f"Serving release file: {release_dir / path}")
+    log.info("Serving release file: %s", release_dir / path)
     return send_from_directory(release_dir, path)
 
 
@@ -130,6 +132,7 @@ def configure_app(site_dir: Path, production: bool = False) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(
         description=f"Local dev server for {constants.SITENAME}."
     )
