@@ -31,7 +31,8 @@ class TestRunUnitTestsTask(unittest.TestCase):
                 class SampleOkTests(unittest.TestCase):
                     def test_pass(self) -> None:
                         print("noisy-pass-stdout")
-                        logging.getLogger("sample.pass").warning("noisy-pass-warn")
+                        logging.getLogger("sample.pass").info("quiet-pass-info")
+                        logging.getLogger("sample.pass").warning("visible-pass-warn")
                         self.assertEqual(1 + 1, 2)
                     def test_fail(self) -> None:
                         print("fail-stdout-detail")
@@ -53,7 +54,7 @@ class TestRunUnitTestsTask(unittest.TestCase):
     def test_runs_all_tests_and_reports_failures(self) -> None:
         logger = logging.getLogger("test.run_unit_tests")
         reporter = LogProgressReporter(logger=logger, log_steps=True)
-        with self.assertLogs(logger, level=logging.INFO) as captured:
+        with self.assertLogs(None, level=logging.INFO) as captured:
             summary = RunUnitTestsTask(
                 tests_dir=self.tests_dir,
                 skip_basics=False,
@@ -67,7 +68,11 @@ class TestRunUnitTestsTask(unittest.TestCase):
         self.assertFalse(summary.ok)
         joined = "\n".join(captured.output)
         self.assertIn("(3/3 tests)", joined)
-        self.assertNotIn("noisy-pass-warn", joined)
+        self.assertNotIn("quiet-pass-info", joined)
+        self.assertIn(
+            "[test_sample_ok.SampleOkTests.test_pass] visible-pass-warn",
+            joined,
+        )
         self.assertIn("fail-stdout-detail", summary.failures[0][1])
         self.assertIn("fail-warn-detail", summary.failures[0][1])
 

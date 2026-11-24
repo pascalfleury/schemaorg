@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+import copy
 from dataclasses import dataclass
 import io
 import logging
@@ -50,8 +51,35 @@ class _ShardOutcome:
     unexpected_success_ids: tuple[str, ...]
 
 
+class _TestLogHandler(logging.Handler):
+    """Buffers test logs for failures and forwards WARNING+ tagged with test ID."""
+
+    def __init__(
+        self,
+        test_id: str,
+        buffer: io.StringIO,
+        passthrough: list[logging.Handler],
+    ) -> None:
+        super().__init__()
+        self._test_id: str = test_id
+        self._buffer: io.StringIO = buffer
+        self._passthrough: list[logging.Handler] = passthrough
+        self._formatter: logging.Formatter = logging.Formatter(
+            "%(levelname)s %(name)s: %(message)s"
+        )
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self._buffer.write(self._formatter.format(record) + "\n")
+        if record.levelno >= logging.WARNING:
+            tagged = copy.copy(record)
+            tagged.msg = f"[{self._test_id}] {record.getMessage()}"
+            tagged.args = ()
+            for handler in self._passthrough:
+                handler.handle(tagged)
+
+
 class _CollectingTestResult(unittest.TestResult):
-    """Collects picklable outcomes and buffers stdio/logs for passing tests."""
+    """Collects picklable outcomes, buffers stdio, and tags WARNING+ logs with test ID."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -62,15 +90,17 @@ class _CollectingTestResult(unittest.TestResult):
 
     def startTest(self, test: unittest.TestCase) -> None:
         super().startTest(test)
-        self.test_ids.append(test.id())
+        test_id = test.id()
+        self.test_ids.append(test_id)
         self._log_buffer = io.StringIO()
         root = logging.getLogger()
         self._saved_root_handlers = list(root.handlers)
-        handler = logging.StreamHandler(self._log_buffer)
-        handler.setLevel(root.level)
-        handler.setFormatter(
-            logging.Formatter("%(levelname)s %(name)s: %(message)s")
+        handler = _TestLogHandler(
+            test_id=test_id,
+            buffer=self._log_buffer,
+            passthrough=self._saved_root_handlers,
         )
+        handler.setLevel(root.level)
         root.handlers = [handler]
 
     def stopTest(self, test: unittest.TestCase) -> None:
