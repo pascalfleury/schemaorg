@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 import json
 import logging
+import re
 from typing import Any, NamedTuple, Protocol
 import warnings
 
@@ -232,6 +233,45 @@ class ExampleValidator:
             )
 
 
+_NODE_SHAPE_RE: re.Pattern[str] = re.compile(
+    r"^<NodeShape\s+(https?://[^\s>]+)>$"
+)
+
+
+def _format_recursion_cycle(message: str) -> str:
+    """Extract the innermost named NodeShape cycle from a pyshacl warning."""
+    lines = message.splitlines()
+    path_line = lines[1] if len(lines) > 1 else message
+    nodes: list[str] = []
+    for token in path_line.split("->"):
+        match = _NODE_SHAPE_RE.match(token.strip())
+        if match:
+            uri = match.group(1)
+            name = (
+                uri.rsplit("#", 1)[-1]
+                .rsplit("/", 1)[-1]
+                .removeprefix("ValidSchema")
+            )
+            nodes.append(name)
+    if not nodes:
+        return lines[0] if lines else message
+    if len(nodes) >= 2 and nodes[-1] in nodes[:-1]:
+        start = len(nodes) - 2 - nodes[-2::-1].index(nodes[-1])
+        nodes = nodes[start:]
+    return " -> ".join(nodes)
+
+
+def _summarize_cycles(example_name: str, cycles: Sequence[str]) -> str:
+    unique = list(dict.fromkeys(cycles))
+    if len(unique) == 1:
+        suffix = f" ({len(cycles)}x)" if len(cycles) > 1 else ""
+        return f"SHACL cycle in {example_name}: {unique[0]}{suffix}"
+    return (
+        f"SHACL cycles in {example_name}: {unique[0]} "
+        f"(+{len(unique) - 1} more, {len(cycles)} total)"
+    )
+
+
 def format_numbered_source(raw_jsonld: str) -> str:
     return "\n".join(
         f"{i:4d}: {line.rstrip()}"
@@ -307,56 +347,81 @@ class ValidateExamplesTask:
 
             def _validate_idx(
                 idx: int,
-            ) -> tuple[int, bool, bool, str | None, str | None]:
-                res = engine.validate(self.examples[idx])
+            ) -> tuple[
+                int, bool, bool, str | None, str | None, tuple[str, ...]
+            ]:
+                cycles: list[str] = []
+                with warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always", ShapeRecursionWarning)
+                    res = engine.validate(self.examples[idx])
+                for item in caught:
+                    if issubclass(item.category, ShapeRecursionWarning):
+                        cycles.append(
+                            _format_recursion_cycle(str(item.message))
+                        )
+                    else:
+                        warnings.warn_explicit(
+                            item.message,
+                            item.category,
+                            item.filename,
+                            item.lineno,
+                        )
                 return (
                     idx,
                     res.targeted,
                     res.conforms,
                     res.report,
                     res.error,
+                    tuple(cycles),
                 )
 
             targeted_count = 0
             failures: list[ExampleResult] = []
 
-            # Schema.org shapes are intentionally cyclic (e.g. Organization -> parentOrganization).
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=ShapeRecursionWarning)
-                for idx, targeted, conforms, report, error in self.executor.map(
-                    _validate_idx, range(len(self.examples))
-                ):
-                    result = ExampleResult(
-                        example=self.examples[idx],
-                        targeted=targeted,
-                        conforms=conforms,
-                        report=report,
-                        error=error,
+            for (
+                idx,
+                targeted,
+                conforms,
+                report,
+                error,
+                cycles,
+            ) in self.executor.map(_validate_idx, range(len(self.examples))):
+                result = ExampleResult(
+                    example=self.examples[idx],
+                    targeted=targeted,
+                    conforms=conforms,
+                    report=report,
+                    error=error,
+                )
+                if not self.invalid_only:
+                    p.step(result.name)
+                if result.targeted:
+                    targeted_count += 1
+                if cycles:
+                    p.log(
+                        _summarize_cycles(result.name, cycles),
+                        logging.WARNING,
                     )
-                    if not self.invalid_only:
-                        p.step(result.name)
-                    if result.targeted:
-                        targeted_count += 1
 
-                    failed = result.error is not None or not result.conforms
-                    if result.error is not None:
-                        failures.append(result)
-                        p.log(
-                            f"Invalid JSON example {result.name}: {result.error}",
-                            logging.ERROR,
-                        )
-                    elif not result.conforms:
-                        failures.append(result)
-                        p.log(
-                            f"Validation failed for example {result.name}:\n{result.report}",
-                            logging.ERROR,
-                        )
-                    if self.source_output and failed:
-                        p.log(
-                            f"Source:\n{format_numbered_source(result.example.getJsonldRaw())}",
-                            logging.INFO,
-                        )
-                    p.advance(1)
+                failed = result.error is not None or not result.conforms
+                if result.error is not None:
+                    failures.append(result)
+                    p.log(
+                        f"Invalid JSON example {result.name}: {result.error}",
+                        logging.ERROR,
+                    )
+                elif not result.conforms:
+                    failures.append(result)
+                    p.log(
+                        f"Validation failed for example {result.name}:\n{result.report}",
+                        logging.ERROR,
+                    )
+                if self.source_output and failed:
+                    p.log(
+                        f"Source:\n{format_numbered_source(result.example.getJsonldRaw())}",
+                        logging.INFO,
+                    )
+                p.advance(1)
 
         if not targeted_count:
             raise ShaclConfigError(

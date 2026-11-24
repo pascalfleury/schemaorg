@@ -140,7 +140,7 @@ class TestValidateExamplesTask(unittest.TestCase):
                 executor=SequentialExecutor(),
             ).run()
 
-    def test_silences_shape_recursion_warnings(self) -> None:
+    def test_logs_short_warning_for_shape_recursion_cycles(self) -> None:
         shapes = self.releases.file(
             self.version.next(), protocol="", scope="shapes", extension=".shacl"
         )
@@ -149,9 +149,9 @@ class TestValidateExamplesTask(unittest.TestCase):
                 @prefix sh: <http://www.w3.org/ns/shacl#> .
                 @prefix schema: <http://schema.org/> .
                 @prefix ex: <http://example.org/> .
-                ex:PersonShape a sh:NodeShape ;
+                ex:ValidSchemaPerson a sh:NodeShape ;
                     sh:targetClass schema:Person ;
-                    sh:property [ sh:path schema:knows ; sh:node ex:PersonShape ] .
+                    sh:property [ sh:path schema:knows ; sh:node ex:ValidSchemaPerson ] .
             """),
             encoding="utf-8",
         )
@@ -160,7 +160,12 @@ class TestValidateExamplesTask(unittest.TestCase):
             '{"@context": "http://schema.org/", "@id": "http://example.org/a", '
             '"@type": "Person", "knows": {"@id": "http://example.org/a"}}',
         )
-        with warnings.catch_warnings(record=True) as caught:
+        logger = logging.getLogger("test.validate_cycle")
+        reporter = LogProgressReporter(logger=logger, log_steps=False)
+        with (
+            warnings.catch_warnings(record=True) as caught,
+            self.assertLogs(logger, level=logging.WARNING) as captured,
+        ):
             warnings.simplefilter("always")
             summary = ValidateExamplesTask(
                 releases=self.releases,
@@ -168,7 +173,7 @@ class TestValidateExamplesTask(unittest.TestCase):
                 examples=(cyclic,),
                 invalid_only=False,
                 source_output=False,
-                progress=NullProgressReporter(),
+                progress=reporter,
                 executor=SequentialExecutor(),
             ).run()
 
@@ -177,6 +182,14 @@ class TestValidateExamplesTask(unittest.TestCase):
             w for w in caught if issubclass(w.category, ShapeRecursionWarning)
         ]
         self.assertEqual(recursion_warnings, [])
+        self.assertTrue(
+            any(
+                "SHACL cycle in eg-cycle: Person -> Person" in line
+                and "\n" not in line
+                for line in captured.output
+            ),
+            captured.output,
+        )
 
 
 if __name__ == "__main__":
