@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import contextlib
 import io
 import logging
+import sys
 import threading
 import unittest
 
@@ -148,6 +150,28 @@ class TestProgressReporter(unittest.TestCase):
         finally:
             root.handlers = saved_handlers
             root.setLevel(saved_level)
+
+    def test_rich_progress_redirects_stdio_only_on_terminals(self) -> None:
+        non_tty_buf = io.StringIO()
+        non_tty = Console(file=non_tty_buf, force_terminal=False, width=100)
+        captured_out = io.StringIO()
+        with contextlib.redirect_stdout(captured_out):
+            with RichProgressReporter(console=non_tty) as reporter:
+                with reporter.task("Non-TTY", total=1, unit="items") as p:
+                    print("stays-on-stdout")
+                    p.advance(1)
+        self.assertIn("stays-on-stdout", captured_out.getvalue())
+        self.assertNotIn("stays-on-stdout", non_tty_buf.getvalue())
+
+        tty_buf = io.StringIO()
+        tty = Console(file=tty_buf, force_terminal=True, width=100)
+        with RichProgressReporter(console=tty) as reporter:
+            with reporter.task("TTY", total=1, unit="items") as p:
+                print("routed-above-bar")
+                print("stderr-above-bar", file=sys.stderr)
+                p.advance(1)
+        self.assertIn("routed-above-bar", tty_buf.getvalue())
+        self.assertIn("stderr-above-bar", tty_buf.getvalue())
 
 
 if __name__ == "__main__":

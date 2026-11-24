@@ -221,8 +221,8 @@ class RichProgressReporter:
             console=self.console,
             auto_refresh=False,
             transient=False,
-            redirect_stdout=False,
-            redirect_stderr=False,
+            redirect_stdout=self.console.is_terminal,
+            redirect_stderr=self.console.is_terminal,
             expand=True,
         )
 

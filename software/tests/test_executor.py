@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import contextlib
+import io
+import logging
+import sys
 import unittest
 
 from schemaorg.executor import (
@@ -65,6 +69,34 @@ class TestTaskExecutors(unittest.TestCase):
         self.assertEqual(shard_sequence([1, 2], 5), [(1,), (2,)])
         with self.assertRaises(ValueError):
             shard_sequence([1], 0)
+
+    def test_process_executor_replays_worker_logs_and_stdio_in_parent(
+        self,
+    ) -> None:
+        logger = logging.getLogger("test.executor.replay")
+
+        def emit(val: int) -> int:
+            if val == 0:
+                logger.warning("warn-%d", val)
+            elif val == 1:
+                print(f"out-{val}")
+                print(f"err-{val}", file=sys.stderr)
+            return val
+
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        executor = ProcessTaskExecutor(max_workers=2)
+        with (
+            self.assertLogs(None, level=logging.WARNING) as captured,
+            contextlib.redirect_stdout(out_buf),
+            contextlib.redirect_stderr(err_buf),
+        ):
+            results = list(executor.map(emit, [0, 1]))
+
+        self.assertEqual(sorted(results), [0, 1])
+        self.assertIn("WARNING:test.executor.replay:warn-0", captured.output)
+        self.assertEqual(out_buf.getvalue().strip(), "out-1")
+        self.assertEqual(err_buf.getvalue().strip(), "err-1")
 
 
 if __name__ == "__main__":

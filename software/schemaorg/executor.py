@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
 import concurrent.futures
+import io
+import logging
 import multiprocessing
 import os
 import queue
+import sys
 import threading
 import traceback
 from typing import Any, Protocol, TypeVar
@@ -112,6 +115,36 @@ class ThreadTaskExecutor:
             return [future.result() for future in futures]
 
 
+class _RecordCaptureHandler(logging.Handler):
+    """Captures emitted log records in forked workers for parent replay."""
+
+    def __init__(self, records: list[tuple[str, int, str]]) -> None:
+        super().__init__()
+        self._records: list[tuple[str, int, str]] = records
+        self._formatter: logging.Formatter = logging.Formatter("%(message)s")
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self._records.append(
+            (record.name, record.levelno, self._formatter.format(record))
+        )
+
+
+def _replay_worker_output(
+    logs: Sequence[tuple[str, int, str]],
+    out_text: str,
+    err_text: str,
+) -> None:
+    for logger_name, levelno, msg in logs:
+        target = logging.getLogger(None if logger_name == "root" else logger_name)
+        target.log(levelno, "%s", msg)
+    if out_text:
+        sys.stdout.write(out_text)
+        sys.stdout.flush()
+    if err_text:
+        sys.stderr.write(err_text)
+        sys.stderr.flush()
+
+
 class ProcessTaskExecutor:
     """Fork-based process executor with zero module globals or input pickling.
 
@@ -149,6 +182,10 @@ class ProcessTaskExecutor:
         result_queue: Any = ctx.Queue()
 
         def _worker() -> None:
+            root = logging.getLogger()
+            records: list[tuple[str, int, str]] = []
+            capture_handler = _RecordCaptureHandler(records)
+            capture_handler.setLevel(root.level)
             try:
                 while True:
                     with counter.get_lock():
@@ -156,14 +193,35 @@ class ProcessTaskExecutor:
                         counter.value = idx + 1
                     if idx >= total:
                         return
+                    records.clear()
+                    # Isolate worker logs/stdio from parent's TTY live display.
+                    root.handlers = [capture_handler]
+                    out_buf = io.StringIO()
+                    err_buf = io.StringIO()
+                    sys.stdout = out_buf
+                    sys.stderr = err_buf
                     try:
                         value = fn(items[idx])
                     except BaseException as exc:  # noqa: BLE001
-                        result_queue.put(
-                            (idx, False, traceback.format_exc(), str(exc))
-                        )
+                        result_queue.put((
+                            idx,
+                            False,
+                            traceback.format_exc(),
+                            str(exc),
+                            list(records),
+                            out_buf.getvalue(),
+                            err_buf.getvalue(),
+                        ))
                     else:
-                        result_queue.put((idx, True, value, ""))
+                        result_queue.put((
+                            idx,
+                            True,
+                            value,
+                            "",
+                            list(records),
+                            out_buf.getvalue(),
+                            err_buf.getvalue(),
+                        ))
             finally:
                 result_queue.close()
                 result_queue.join_thread()
@@ -176,7 +234,15 @@ class ProcessTaskExecutor:
         try:
             while received < total:
                 try:
-                    idx, ok, payload, err_msg = result_queue.get(timeout=0.5)
+                    (
+                        idx,
+                        ok,
+                        payload,
+                        err_msg,
+                        logs,
+                        out_text,
+                        err_text,
+                    ) = result_queue.get(timeout=0.5)
                 except queue.Empty:
                     if not any(proc.is_alive() for proc in procs):
                         raise RuntimeError(
@@ -185,6 +251,7 @@ class ProcessTaskExecutor:
                         )
                     continue
                 received += 1
+                _replay_worker_output(logs, out_text, err_text)
                 if not ok:
                     raise RuntimeError(
                         f"Worker failed on item {idx}: {err_msg}\n{payload}"
