@@ -79,11 +79,10 @@ class _TestLogHandler(logging.Handler):
 
 
 class _CollectingTestResult(unittest.TestResult):
-    """Collects picklable outcomes, buffers stdio, and tags WARNING+ logs with test ID."""
+    """Collects picklable outcomes and tags WARNING+ logs with test ID."""
 
     def __init__(self) -> None:
         super().__init__()
-        self.buffer = True
         self.test_ids: list[str] = []
         self._log_buffer: io.StringIO = io.StringIO()
         self._saved_root_handlers: list[logging.Handler] = []
@@ -105,8 +104,6 @@ class _CollectingTestResult(unittest.TestResult):
 
     def stopTest(self, test: unittest.TestCase) -> None:
         logging.getLogger().handlers = self._saved_root_handlers
-        # Traceback already embeds captured stdout/stderr; suppress duplicate mirror.
-        self._mirrorOutput = False
         super().stopTest(test)
 
     def _append_captured_logs(

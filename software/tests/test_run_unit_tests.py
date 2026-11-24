@@ -30,12 +30,10 @@ class TestRunUnitTestsTask(unittest.TestCase):
                 import unittest
                 class SampleOkTests(unittest.TestCase):
                     def test_pass(self) -> None:
-                        print("noisy-pass-stdout")
                         logging.getLogger("sample.pass").info("quiet-pass-info")
                         logging.getLogger("sample.pass").warning("visible-pass-warn")
                         self.assertEqual(1 + 1, 2)
                     def test_fail(self) -> None:
-                        print("fail-stdout-detail")
                         logging.getLogger("sample.fail").warning("fail-warn-detail")
                         self.assertEqual(1, 2)
             """),
@@ -73,7 +71,6 @@ class TestRunUnitTestsTask(unittest.TestCase):
             "[test_sample_ok.SampleOkTests.test_pass] visible-pass-warn",
             joined,
         )
-        self.assertIn("fail-stdout-detail", summary.failures[0][1])
         self.assertIn("fail-warn-detail", summary.failures[0][1])
 
     def test_skip_basics_runs_only_graphs_pattern(self) -> None:
