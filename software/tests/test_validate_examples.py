@@ -6,7 +6,9 @@ from pathlib import Path
 import tempfile
 import textwrap
 import unittest
+import warnings
 
+from pyshacl.errors import ShapeRecursionWarning  # type: ignore[import-untyped]
 import rdflib
 
 from schemaorg.executor import ProcessTaskExecutor, SequentialExecutor
@@ -137,6 +139,44 @@ class TestValidateExamplesTask(unittest.TestCase):
                 progress=NullProgressReporter(),
                 executor=SequentialExecutor(),
             ).run()
+
+    def test_silences_shape_recursion_warnings(self) -> None:
+        shapes = self.releases.file(
+            self.version.next(), protocol="", scope="shapes", extension=".shacl"
+        )
+        shapes.write_text(
+            textwrap.dedent("""\
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                @prefix schema: <http://schema.org/> .
+                @prefix ex: <http://example.org/> .
+                ex:PersonShape a sh:NodeShape ;
+                    sh:targetClass schema:Person ;
+                    sh:property [ sh:path schema:knows ; sh:node ex:PersonShape ] .
+            """),
+            encoding="utf-8",
+        )
+        cyclic = _make_example(
+            "eg-cycle",
+            '{"@context": "http://schema.org/", "@id": "http://example.org/a", '
+            '"@type": "Person", "knows": {"@id": "http://example.org/a"}}',
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            summary = ValidateExamplesTask(
+                releases=self.releases,
+                version=self.version.next(),
+                examples=(cyclic,),
+                invalid_only=False,
+                source_output=False,
+                progress=NullProgressReporter(),
+                executor=SequentialExecutor(),
+            ).run()
+
+        self.assertEqual(summary.error_count, 0)
+        recursion_warnings = [
+            w for w in caught if issubclass(w.category, ShapeRecursionWarning)
+        ]
+        self.assertEqual(recursion_warnings, [])
 
 
 if __name__ == "__main__":

@@ -7,9 +7,13 @@ from dataclasses import dataclass
 import json
 import logging
 from typing import Any, NamedTuple, Protocol
+import warnings
 
 import owlrl  # type: ignore[import-untyped]
-from pyshacl.errors import ValidationFailure  # type: ignore[import-untyped]
+from pyshacl.errors import (  # type: ignore[import-untyped]
+    ShapeRecursionWarning,
+    ValidationFailure,
+)
 from pyshacl.graph_abstraction import DataGraph  # type: ignore[import-untyped]
 from pyshacl.monkey import (  # type: ignore[import-untyped]
     rdflib_bool_patch,
@@ -316,40 +320,43 @@ class ValidateExamplesTask:
             targeted_count = 0
             failures: list[ExampleResult] = []
 
-            for idx, targeted, conforms, report, error in self.executor.map(
-                _validate_idx, range(len(self.examples))
-            ):
-                result = ExampleResult(
-                    example=self.examples[idx],
-                    targeted=targeted,
-                    conforms=conforms,
-                    report=report,
-                    error=error,
-                )
-                if not self.invalid_only:
-                    p.step(result.name)
-                if result.targeted:
-                    targeted_count += 1
+            # Schema.org shapes are intentionally cyclic (e.g. Organization -> parentOrganization).
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=ShapeRecursionWarning)
+                for idx, targeted, conforms, report, error in self.executor.map(
+                    _validate_idx, range(len(self.examples))
+                ):
+                    result = ExampleResult(
+                        example=self.examples[idx],
+                        targeted=targeted,
+                        conforms=conforms,
+                        report=report,
+                        error=error,
+                    )
+                    if not self.invalid_only:
+                        p.step(result.name)
+                    if result.targeted:
+                        targeted_count += 1
 
-                failed = result.error is not None or not result.conforms
-                if result.error is not None:
-                    failures.append(result)
-                    p.log(
-                        f"Invalid JSON example {result.name}: {result.error}",
-                        logging.ERROR,
-                    )
-                elif not result.conforms:
-                    failures.append(result)
-                    p.log(
-                        f"Validation failed for example {result.name}:\n{result.report}",
-                        logging.ERROR,
-                    )
-                if self.source_output and failed:
-                    p.log(
-                        f"Source:\n{format_numbered_source(result.example.getJsonldRaw())}",
-                        logging.INFO,
-                    )
-                p.advance(1)
+                    failed = result.error is not None or not result.conforms
+                    if result.error is not None:
+                        failures.append(result)
+                        p.log(
+                            f"Invalid JSON example {result.name}: {result.error}",
+                            logging.ERROR,
+                        )
+                    elif not result.conforms:
+                        failures.append(result)
+                        p.log(
+                            f"Validation failed for example {result.name}:\n{result.report}",
+                            logging.ERROR,
+                        )
+                    if self.source_output and failed:
+                        p.log(
+                            f"Source:\n{format_numbered_source(result.example.getJsonldRaw())}",
+                            logging.INFO,
+                        )
+                    p.advance(1)
 
         if not targeted_count:
             raise ShaclConfigError(
