@@ -93,6 +93,61 @@ A summary view of the current published release is available from: <a href="/ver
 
 <!-- note: please keep this file well-formed, i.e. close li tags etc. -->
 
+
+<tr>
+  <td class="release">30.2<br/>2026-11-24</td>
+  <td>
+    <span id="v30.2"></span>
+    <p>
+      Version 30.2 adds the <a href="/JainDiet">JainDiet</a> enumeration value to <a href="/RestrictedDiet">RestrictedDiet</a>, refines OWL property modeling and RDF namespace prefixes, and enforces stricter validation and IDs across vocabulary examples. It also delivers major build, SHACL validation, and site-generation performance and architecture upgrades.</p>
+  </td>
+  <td>
+    <ul>
+      <li id="g4975">
+        <a href="https://github.com/schemaorg/schemaorg/pull/4975">PR #4975</a>:
+        Add enumeration value <a href="/JainDiet">JainDiet</a> to <a href="/RestrictedDiet">RestrictedDiet</a> (in pending).
+      </li>
+      <li id="g4942">
+        <a href="https://github.com/schemaorg/schemaorg/pull/4942">PR #4942</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4974">PR #4974</a>:
+        Fix OWL property modeling and standardize source Turtle <code>@prefix</code> declarations, updating term metadata for <a href="/priceSpecification">priceSpecification</a>, <a href="/timestamp">timestamp</a>, <code>http://unece.org/vocab#AmountType</code>, and <code>http://www.w3.org/ns/prov#atTime</code>.
+      </li>
+      <li id="g4922">
+        <a href="https://github.com/schemaorg/schemaorg/pull/4922">PR #4922</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4948">PR #4948</a>:
+        Require unique identifiers across vocabulary examples and fix markup examples failing SHACL validation.
+      </li>
+      <li id="g4965">
+        <a href="https://github.com/schemaorg/schemaorg/pull/4965">PR #4965</a>:
+        Update monthly Schema.org public adoption statistics (2026-10).
+      </li>
+      <li id="g4938">
+        <a href="https://github.com/schemaorg/schemaorg/pull/4938">PR #4938</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4939">PR #4939</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4947">PR #4947</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4954">PR #4954</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4961">PR #4961</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4964">PR #4964</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4969">PR #4969</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4970">PR #4970</a>:
+        Unify property inheritance across first- and second-level <a href="/Enumeration">Enumeration</a> types, fix Stage 1/Stage 2 site build state isolation and page templates, align hardcoded RDF prefixes, and restore dormant SPARQL and SHACL test assertions.
+      </li>
+      <li id="g4972">
+        <a href="https://github.com/schemaorg/schemaorg/pull/4924">PR #4924</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4932">PR #4932</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4951">PR #4951</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4959">PR #4959</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4960">PR #4960</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4968">PR #4968</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4972">PR #4972</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4973">PR #4973</a>,
+        <a href="https://github.com/schemaorg/schemaorg/pull/4980">PR #4980</a>:
+        Modernize build and release tooling with parallelized task execution, precompiled SHACL validation, <code>pydantic-rdf</code> model loading, unified <code>SdoUri</code> handling, <code>next</code> release target support, Python 3.11+ packaging, Node 24 CI workflows, and a guided release CLI.
+      </li>
+    </ul>
+  </td>
+</tr>
+
 <tr>
   <td class="release">30.1<br/>2026-09-16</td>
   <td>

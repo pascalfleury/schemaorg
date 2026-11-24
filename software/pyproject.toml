@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "schemaorg"
-version = "30.1"
+version = "30.2"
 description = "Schema.org software stack"
 readme = "SOFTWARE_README.md"
 requires-python = ">=3.11"

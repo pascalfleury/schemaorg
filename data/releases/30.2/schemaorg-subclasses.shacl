@@ -1,0 +1,1973 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <http://schema.org/> .
+
+schema:3DModel rdfs:subClassOf schema:MediaObject .
+
+schema:AMRadioChannel rdfs:subClassOf schema:RadioChannel .
+
+schema:APIReference rdfs:subClassOf schema:TechArticle .
+
+schema:AboutPage rdfs:subClassOf schema:WebPage .
+
+schema:AcceptAction rdfs:subClassOf schema:AllocateAction .
+
+schema:AccountingService rdfs:subClassOf schema:FinancialService .
+
+schema:ActionAccessSpecification rdfs:subClassOf schema:Intangible .
+
+schema:ActionStatusType rdfs:subClassOf schema:StatusEnumeration .
+
+schema:ActivateAction rdfs:subClassOf schema:ControlAction .
+
+schema:AdultEntertainment rdfs:subClassOf schema:EntertainmentBusiness .
+
+schema:AdultOrientedEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:AdvertiserContentArticle rdfs:subClassOf schema:Article .
+
+schema:AggregateOffer rdfs:subClassOf schema:Offer .
+
+schema:AgreeAction rdfs:subClassOf schema:ReactAction .
+
+schema:Airline rdfs:subClassOf schema:Organization .
+
+schema:Airport rdfs:subClassOf schema:CivicStructure .
+
+schema:AlignmentObject rdfs:subClassOf schema:Intangible .
+
+schema:AmpStory rdfs:subClassOf schema:CreativeWork,
+        schema:MediaObject .
+
+schema:AmusementPark rdfs:subClassOf schema:EntertainmentBusiness .
+
+schema:AnalysisNewsArticle rdfs:subClassOf schema:NewsArticle .
+
+schema:AnatomicalSystem rdfs:subClassOf schema:MedicalEntity .
+
+schema:AnimalShelter rdfs:subClassOf schema:LocalBusiness .
+
+schema:Answer rdfs:subClassOf schema:Comment .
+
+schema:Apartment rdfs:subClassOf schema:Accommodation .
+
+schema:ApartmentComplex rdfs:subClassOf schema:Residence .
+
+schema:AppendAction rdfs:subClassOf schema:InsertAction .
+
+schema:ApplyAction rdfs:subClassOf schema:OrganizeAction .
+
+schema:ApprovedIndication rdfs:subClassOf schema:MedicalIndication .
+
+schema:Aquarium rdfs:subClassOf schema:CivicStructure .
+
+schema:ArchiveComponent rdfs:subClassOf schema:CreativeWork .
+
+schema:ArchiveOrganization rdfs:subClassOf schema:LocalBusiness .
+
+schema:ArriveAction rdfs:subClassOf schema:MoveAction .
+
+schema:ArtGallery rdfs:subClassOf schema:EntertainmentBusiness .
+
+schema:Artery rdfs:subClassOf schema:Vessel .
+
+schema:AskAction rdfs:subClassOf schema:CommunicateAction .
+
+schema:AskPublicNewsArticle rdfs:subClassOf schema:NewsArticle .
+
+schema:AssignAction rdfs:subClassOf schema:AllocateAction .
+
+schema:Atlas rdfs:subClassOf schema:CreativeWork .
+
+schema:Attorney rdfs:subClassOf schema:LegalService .
+
+schema:AudioObjectSnapshot rdfs:subClassOf schema:AudioObject .
+
+schema:Audiobook rdfs:subClassOf schema:AudioObject,
+        schema:Book .
+
+schema:Audiology rdfs:subClassOf schema:MedicalBusiness .
+
+schema:AuthenticateAction rdfs:subClassOf schema:ControlAction .
+
+schema:AuthorizeAction rdfs:subClassOf schema:AllocateAction .
+
+schema:AutoBodyShop rdfs:subClassOf schema:AutomotiveBusiness .
+
+schema:AutoDealer rdfs:subClassOf schema:AutomotiveBusiness .
+
+schema:AutoPartsStore rdfs:subClassOf schema:AutomotiveBusiness,
+        schema:Store .
+
+schema:AutoRental rdfs:subClassOf schema:AutomotiveBusiness .
+
+schema:AutoRepair rdfs:subClassOf schema:AutomotiveBusiness .
+
+schema:AutoWash rdfs:subClassOf schema:AutomotiveBusiness .
+
+schema:AutomatedTeller rdfs:subClassOf schema:FinancialService .
+
+schema:BackgroundNewsArticle rdfs:subClassOf schema:NewsArticle .
+
+schema:Bakery rdfs:subClassOf schema:FoodEstablishment .
+
+schema:BankOrCreditUnion rdfs:subClassOf schema:FinancialService .
+
+schema:BarOrPub rdfs:subClassOf schema:FoodEstablishment .
+
+schema:Barcode rdfs:subClassOf schema:ImageObject .
+
+schema:Beach rdfs:subClassOf schema:CivicStructure .
+
+schema:BeautySalon rdfs:subClassOf schema:HealthAndBeautyBusiness .
+
+schema:BedAndBreakfast rdfs:subClassOf schema:LodgingBusiness .
+
+schema:BedDetails rdfs:subClassOf schema:Intangible .
+
+schema:BedType rdfs:subClassOf schema:QualitativeValue .
+
+schema:BefriendAction rdfs:subClassOf schema:InteractAction .
+
+schema:BikeStore rdfs:subClassOf schema:Store .
+
+schema:Blog rdfs:subClassOf schema:CreativeWork .
+
+schema:BloodTest rdfs:subClassOf schema:MedicalTest .
+
+schema:BoardingPolicyType rdfs:subClassOf schema:Enumeration .
+
+schema:BoatReservation rdfs:subClassOf schema:Reservation .
+
+schema:BoatTerminal rdfs:subClassOf schema:CivicStructure .
+
+schema:BoatTrip rdfs:subClassOf schema:Trip .
+
+schema:BodyMeasurementTypeEnumeration rdfs:subClassOf schema:MeasurementTypeEnumeration .
+
+schema:Bone rdfs:subClassOf schema:AnatomicalStructure .
+
+schema:BookFormatType rdfs:subClassOf schema:Enumeration .
+
+schema:BookSeries rdfs:subClassOf schema:CreativeWorkSeries .
+
+schema:BookStore rdfs:subClassOf schema:Store .
+
+schema:BookmarkAction rdfs:subClassOf schema:OrganizeAction .
+
+schema:BorrowAction rdfs:subClassOf schema:TransferAction .
+
+schema:BowlingAlley rdfs:subClassOf schema:SportsActivityLocation .
+
+schema:BrainStructure rdfs:subClassOf schema:AnatomicalStructure .
+
+schema:Brand rdfs:subClassOf schema:Intangible,
+        <https://www.omg.org/spec/Commons/Classifiers/Classifier> .
+
+schema:BreadcrumbList rdfs:subClassOf schema:ItemList .
+
+schema:Brewery rdfs:subClassOf schema:FoodEstablishment .
+
+schema:Bridge rdfs:subClassOf schema:CivicStructure .
+
+schema:BroadcastEvent rdfs:subClassOf schema:PublicationEvent .
+
+schema:BroadcastFrequencySpecification rdfs:subClassOf schema:Intangible .
+
+schema:BrokerageAccount rdfs:subClassOf schema:InvestmentOrDeposit .
+
+schema:BuddhistTemple rdfs:subClassOf schema:PlaceOfWorship .
+
+schema:BusOrCoach rdfs:subClassOf schema:Vehicle .
+
+schema:BusReservation rdfs:subClassOf schema:Reservation .
+
+schema:BusStation rdfs:subClassOf schema:CivicStructure .
+
+schema:BusStop rdfs:subClassOf schema:CivicStructure .
+
+schema:BusTrip rdfs:subClassOf schema:Trip .
+
+schema:BusinessAudience rdfs:subClassOf schema:Audience .
+
+schema:BusinessEntityType rdfs:subClassOf schema:Enumeration .
+
+schema:BusinessEvent rdfs:subClassOf schema:Event .
+
+schema:BusinessFunction rdfs:subClassOf schema:Enumeration .
+
+schema:BuyAction rdfs:subClassOf schema:TradeAction .
+
+schema:CDCPMDRecord rdfs:subClassOf schema:StructuredValue .
+
+schema:CableOrSatelliteService rdfs:subClassOf schema:Service .
+
+schema:CafeOrCoffeeShop rdfs:subClassOf schema:FoodEstablishment .
+
+schema:Campground rdfs:subClassOf schema:CivicStructure,
+        schema:LodgingBusiness .
+
+schema:CampingPitch rdfs:subClassOf schema:Accommodation .
+
+schema:Canal rdfs:subClassOf schema:BodyOfWater .
+
+schema:CancelAction rdfs:subClassOf schema:PlanAction .
+
+schema:Car rdfs:subClassOf schema:Vehicle .
+
+schema:CarUsageType rdfs:subClassOf schema:Enumeration .
+
+schema:Casino rdfs:subClassOf schema:EntertainmentBusiness .
+
+schema:CategoryCodeSet rdfs:subClassOf schema:DefinedTermSet .
+
+schema:CatholicChurch rdfs:subClassOf schema:Church .
+
+schema:Cemetery rdfs:subClassOf schema:CivicStructure .
+
+schema:CertificationStatusEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:Chapter rdfs:subClassOf schema:CreativeWork .
+
+schema:CheckAction rdfs:subClassOf schema:FindAction .
+
+schema:CheckInAction rdfs:subClassOf schema:CommunicateAction .
+
+schema:CheckOutAction rdfs:subClassOf schema:CommunicateAction .
+
+schema:CheckoutPage rdfs:subClassOf schema:WebPage .
+
+schema:ChemicalSubstance rdfs:subClassOf schema:BioChemEntity .
+
+schema:ChildCare rdfs:subClassOf schema:LocalBusiness .
+
+schema:ChildrensEvent rdfs:subClassOf schema:Event .
+
+schema:City rdfs:subClassOf schema:AdministrativeArea .
+
+schema:CityHall rdfs:subClassOf schema:GovernmentBuilding .
+
+schema:Claim rdfs:subClassOf schema:CreativeWork .
+
+schema:ClaimReview rdfs:subClassOf schema:Review .
+
+schema:Class rdfs:subClassOf schema:Intangible .
+
+schema:ClothingStore rdfs:subClassOf schema:Store .
+
+schema:Code rdfs:subClassOf schema:CreativeWork .
+
+schema:CollegeOrUniversity rdfs:subClassOf schema:EducationalOrganization .
+
+schema:ComedyClub rdfs:subClassOf schema:EntertainmentBusiness .
+
+schema:ComedyEvent rdfs:subClassOf schema:Event .
+
+schema:ComicCoverArt rdfs:subClassOf schema:ComicStory,
+        schema:CoverArt .
+
+schema:ComicIssue rdfs:subClassOf schema:PublicationIssue .
+
+schema:ComicSeries rdfs:subClassOf schema:Periodical .
+
+schema:CommentAction rdfs:subClassOf schema:CommunicateAction .
+
+schema:CommunityHealth rdfs:subClassOf schema:MedicalBusiness .
+
+schema:CompleteDataFeed rdfs:subClassOf schema:DataFeed .
+
+schema:CompoundPriceSpecification rdfs:subClassOf schema:PriceSpecification .
+
+schema:ComputerLanguage rdfs:subClassOf schema:Intangible .
+
+schema:ComputerStore rdfs:subClassOf schema:Store .
+
+schema:ConferenceEvent rdfs:subClassOf schema:Event .
+
+schema:ConfirmAction rdfs:subClassOf schema:InformAction .
+
+schema:Consortium rdfs:subClassOf schema:Organization .
+
+schema:ContactPage rdfs:subClassOf schema:WebPage .
+
+schema:ContactPointOption rdfs:subClassOf schema:Enumeration .
+
+schema:Continent rdfs:subClassOf schema:Landform .
+
+schema:ConvenienceStore rdfs:subClassOf schema:Store .
+
+schema:Conversation rdfs:subClassOf schema:CreativeWork .
+
+schema:CookAction rdfs:subClassOf schema:CreateAction .
+
+schema:Cooperative rdfs:subClassOf schema:Organization .
+
+schema:Corporation rdfs:subClassOf schema:Organization .
+
+schema:CorrectionComment rdfs:subClassOf schema:Comment .
+
+schema:Country rdfs:subClassOf schema:AdministrativeArea,
+        <https://www.omg.org/spec/Commons/GeopoliticalEntities/GeopoliticalEntity> .
+
+schema:Course rdfs:subClassOf schema:CreativeWork,
+        schema:LearningResource .
+
+schema:CourseInstance rdfs:subClassOf schema:Event .
+
+schema:Courthouse rdfs:subClassOf schema:GovernmentBuilding .
+
+schema:CovidTestingFacility rdfs:subClassOf schema:MedicalClinic .
+
+schema:CreditCard rdfs:subClassOf schema:LoanOrCredit,
+        schema:PaymentCard .
+
+schema:Crematorium rdfs:subClassOf schema:CivicStructure .
+
+schema:CssSelectorType rdfs:subClassOf schema:Text .
+
+schema:CurrencyConversionService rdfs:subClassOf schema:FinancialProduct .
+
+schema:DDxElement rdfs:subClassOf schema:MedicalIntangible .
+
+schema:DENonprofitType rdfs:subClassOf schema:NonprofitType .
+
+schema:DanceEvent rdfs:subClassOf schema:Event .
+
+schema:DanceGroup rdfs:subClassOf schema:PerformingGroup .
+
+schema:DataCatalog rdfs:subClassOf schema:CreativeWork .
+
+schema:DataDownload rdfs:subClassOf schema:MediaObject .
+
+schema:DataFeedItem rdfs:subClassOf schema:Intangible .
+
+schema:DataType rdfs:subClassOf rdfs:Class .
+
+schema:DatedMoneySpecification rdfs:subClassOf schema:StructuredValue .
+
+schema:DayOfWeek rdfs:subClassOf schema:Enumeration .
+
+schema:DaySpa rdfs:subClassOf schema:HealthAndBeautyBusiness .
+
+schema:DeactivateAction rdfs:subClassOf schema:ControlAction .
+
+schema:DeclarationOfConformity rdfs:subClassOf schema:Certification .
+
+schema:DefenceEstablishment rdfs:subClassOf schema:GovernmentBuilding .
+
+schema:DefinedRegion rdfs:subClassOf schema:Place,
+        schema:StructuredValue .
+
+schema:DeleteAction rdfs:subClassOf schema:UpdateAction .
+
+schema:DeliveryChargeSpecification rdfs:subClassOf schema:PriceSpecification .
+
+schema:DeliveryEvent rdfs:subClassOf schema:Event .
+
+schema:DeliveryMethod rdfs:subClassOf schema:Enumeration .
+
+schema:DeliveryTimeSettings rdfs:subClassOf schema:StructuredValue .
+
+schema:Demand rdfs:subClassOf schema:Intangible .
+
+schema:Dentist rdfs:subClassOf schema:LocalBusiness,
+        schema:MedicalBusiness,
+        schema:MedicalOrganization .
+
+schema:DepartAction rdfs:subClassOf schema:MoveAction .
+
+schema:DepartmentStore rdfs:subClassOf schema:Store .
+
+schema:DepositAccount rdfs:subClassOf schema:BankAccount,
+        schema:InvestmentOrDeposit .
+
+schema:Dermatology rdfs:subClassOf schema:MedicalBusiness .
+
+schema:DiagnosticLab rdfs:subClassOf schema:MedicalOrganization .
+
+schema:DiagnosticProcedure rdfs:subClassOf schema:MedicalProcedure .
+
+schema:Diet rdfs:subClassOf schema:CreativeWork,
+        schema:LifestyleModification .
+
+schema:DietNutrition rdfs:subClassOf schema:MedicalBusiness .
+
+schema:DietarySupplement rdfs:subClassOf schema:Product,
+        schema:Substance .
+
+schema:DigitalDocumentPermission rdfs:subClassOf schema:Intangible .
+
+schema:DigitalDocumentPermissionType rdfs:subClassOf schema:Enumeration .
+
+schema:DigitalPlatformEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:DigitalProductPassport rdfs:subClassOf schema:Certification .
+
+schema:DisagreeAction rdfs:subClassOf schema:ReactAction .
+
+schema:DiscoverAction rdfs:subClassOf schema:FindAction .
+
+schema:DiscussionForumPosting rdfs:subClassOf schema:SocialMediaPosting .
+
+schema:DislikeAction rdfs:subClassOf schema:ReactAction .
+
+schema:Distance rdfs:subClassOf schema:Quantity .
+
+schema:Distillery rdfs:subClassOf schema:FoodEstablishment .
+
+schema:DonateAction rdfs:subClassOf schema:TransferAction .
+
+schema:DownloadAction rdfs:subClassOf schema:TransferAction .
+
+schema:DrawAction rdfs:subClassOf schema:CreateAction .
+
+schema:Drawing rdfs:subClassOf schema:CreativeWork .
+
+schema:DrinkAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:DriveWheelConfigurationValue rdfs:subClassOf schema:QualitativeValue .
+
+schema:Drug rdfs:subClassOf schema:Product,
+        schema:Substance .
+
+schema:DrugClass rdfs:subClassOf schema:MedicalEntity .
+
+schema:DrugCost rdfs:subClassOf schema:MedicalEntity .
+
+schema:DrugCostCategory rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:DrugLegalStatus rdfs:subClassOf schema:MedicalIntangible .
+
+schema:DrugPregnancyCategory rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:DrugPrescriptionStatus rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:DrugStrength rdfs:subClassOf schema:MedicalIntangible .
+
+schema:DryCleaningOrLaundry rdfs:subClassOf schema:LocalBusiness .
+
+schema:Duration rdfs:subClassOf schema:Quantity .
+
+schema:EUEnergyEfficiencyEnumeration rdfs:subClassOf schema:EnergyEfficiencyEnumeration .
+
+schema:EatAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:EducationEvent rdfs:subClassOf schema:Event .
+
+schema:EducationalAudience rdfs:subClassOf schema:Audience .
+
+schema:EducationalOccupationalCredential rdfs:subClassOf schema:Credential .
+
+schema:Electrician rdfs:subClassOf schema:HomeAndConstructionBusiness .
+
+schema:ElectronicsStore rdfs:subClassOf schema:Store .
+
+schema:ElementarySchool rdfs:subClassOf schema:EducationalOrganization .
+
+schema:EmailMessage rdfs:subClassOf schema:Message .
+
+schema:Embassy rdfs:subClassOf schema:GovernmentBuilding .
+
+schema:Emergency rdfs:subClassOf schema:MedicalBusiness .
+
+schema:EmployeeRole rdfs:subClassOf schema:OrganizationRole .
+
+schema:EmployerAggregateRating rdfs:subClassOf schema:AggregateRating .
+
+schema:EmployerReview rdfs:subClassOf schema:Review .
+
+schema:EmploymentAgency rdfs:subClassOf schema:LocalBusiness .
+
+schema:EndorseAction rdfs:subClassOf schema:ReactAction .
+
+schema:EndorsementRating rdfs:subClassOf schema:Rating .
+
+schema:Energy rdfs:subClassOf schema:Quantity .
+
+schema:EnergyConsumptionDetails rdfs:subClassOf schema:Intangible .
+
+schema:EnergyStarEnergyEfficiencyEnumeration rdfs:subClassOf schema:EnergyEfficiencyEnumeration .
+
+schema:EngineSpecification rdfs:subClassOf schema:StructuredValue .
+
+schema:EntryPoint rdfs:subClassOf schema:Intangible .
+
+schema:EnvironmentalProductDeclaration rdfs:subClassOf schema:Certification .
+
+schema:Error rdfs:subClassOf <http://sarif.info/Result>,
+        schema:InstantaneousEvent .
+
+schema:EventAttendanceModeEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:EventReservation rdfs:subClassOf schema:Reservation .
+
+schema:EventSeries rdfs:subClassOf schema:Event,
+        schema:Series .
+
+schema:EventStatusType rdfs:subClassOf schema:StatusEnumeration .
+
+schema:EventVenue rdfs:subClassOf schema:CivicStructure .
+
+schema:ExchangeRateSpecification rdfs:subClassOf schema:StructuredValue .
+
+schema:ExerciseAction rdfs:subClassOf schema:PlayAction .
+
+schema:ExerciseGym rdfs:subClassOf schema:SportsActivityLocation .
+
+schema:ExercisePlan rdfs:subClassOf schema:CreativeWork,
+        schema:PhysicalActivity .
+
+schema:ExhibitionEvent rdfs:subClassOf schema:Event .
+
+schema:FAQPage rdfs:subClassOf schema:WebPage .
+
+schema:FMRadioChannel rdfs:subClassOf schema:RadioChannel .
+
+schema:FastFoodRestaurant rdfs:subClassOf schema:FoodEstablishment .
+
+schema:Festival rdfs:subClassOf schema:Event .
+
+schema:FilmAction rdfs:subClassOf schema:CreateAction .
+
+schema:FinancialIncentive rdfs:subClassOf schema:Intangible .
+
+schema:FireStation rdfs:subClassOf schema:CivicStructure,
+        schema:EmergencyService .
+
+schema:Flight rdfs:subClassOf schema:Trip .
+
+schema:FlightReservation rdfs:subClassOf schema:Reservation .
+
+schema:Float rdfs:subClassOf schema:Number .
+
+schema:FloorPlan rdfs:subClassOf schema:Intangible .
+
+schema:Florist rdfs:subClassOf schema:Store .
+
+schema:FollowAction rdfs:subClassOf schema:InteractAction .
+
+schema:FoodEstablishmentReservation rdfs:subClassOf schema:Reservation .
+
+schema:FoodEvent rdfs:subClassOf schema:Event .
+
+schema:FoodService rdfs:subClassOf schema:Service .
+
+schema:FulfillmentTypeEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:FundingAgency rdfs:subClassOf schema:Project .
+
+schema:FundingScheme rdfs:subClassOf schema:Organization .
+
+schema:FurnitureStore rdfs:subClassOf schema:Store .
+
+schema:GameAvailabilityEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:GamePlayMode rdfs:subClassOf schema:Enumeration .
+
+schema:GameServer rdfs:subClassOf schema:Intangible .
+
+schema:GameServerStatus rdfs:subClassOf schema:StatusEnumeration .
+
+schema:GardenStore rdfs:subClassOf schema:Store .
+
+schema:GasStation rdfs:subClassOf schema:AutomotiveBusiness .
+
+schema:GatedResidenceCommunity rdfs:subClassOf schema:Residence .
+
+schema:GenderType rdfs:subClassOf schema:Enumeration .
+
+schema:Gene rdfs:subClassOf schema:BioChemEntity .
+
+schema:GeneralContractor rdfs:subClassOf schema:HomeAndConstructionBusiness .
+
+schema:GeoCircle rdfs:subClassOf schema:GeoShape .
+
+schema:GeoCoordinates rdfs:subClassOf schema:StructuredValue .
+
+schema:GeospatialGeometry rdfs:subClassOf schema:Intangible .
+
+schema:Geriatric rdfs:subClassOf schema:MedicalBusiness .
+
+schema:GiveAction rdfs:subClassOf schema:TransferAction .
+
+schema:GolfCourse rdfs:subClassOf schema:SportsActivityLocation .
+
+schema:GovernmentBenefitsType rdfs:subClassOf schema:Enumeration .
+
+schema:GovernmentOrganization rdfs:subClassOf schema:Organization .
+
+schema:GovernmentPermit rdfs:subClassOf schema:Permit .
+
+schema:GovernmentService rdfs:subClassOf schema:Service .
+
+schema:GroceryStore rdfs:subClassOf schema:Store .
+
+schema:Guide rdfs:subClassOf schema:CreativeWork .
+
+schema:Gynecologic rdfs:subClassOf schema:MedicalBusiness .
+
+schema:HVACBusiness rdfs:subClassOf schema:HomeAndConstructionBusiness .
+
+schema:Hackathon rdfs:subClassOf schema:Event .
+
+schema:HairSalon rdfs:subClassOf schema:HealthAndBeautyBusiness .
+
+schema:HardwareStore rdfs:subClassOf schema:Store .
+
+schema:HealthAspectEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:HealthClub rdfs:subClassOf schema:HealthAndBeautyBusiness,
+        schema:SportsActivityLocation .
+
+schema:HealthInsurancePlan rdfs:subClassOf schema:Intangible .
+
+schema:HealthPlanCostSharingSpecification rdfs:subClassOf schema:Intangible .
+
+schema:HealthPlanFormulary rdfs:subClassOf schema:Intangible .
+
+schema:HealthPlanNetwork rdfs:subClassOf schema:Intangible .
+
+schema:HealthTopicContent rdfs:subClassOf schema:WebContent .
+
+schema:HighSchool rdfs:subClassOf schema:EducationalOrganization .
+
+schema:HinduTemple rdfs:subClassOf schema:PlaceOfWorship .
+
+schema:HobbyShop rdfs:subClassOf schema:Store .
+
+schema:HomeGoodsStore rdfs:subClassOf schema:Store .
+
+schema:Hospital rdfs:subClassOf schema:CivicStructure,
+        schema:EmergencyService,
+        schema:MedicalOrganization .
+
+schema:Hostel rdfs:subClassOf schema:LodgingBusiness .
+
+schema:Hotel rdfs:subClassOf schema:LodgingBusiness .
+
+schema:HotelRoom rdfs:subClassOf schema:Room .
+
+schema:HousePainter rdfs:subClassOf schema:HomeAndConstructionBusiness .
+
+schema:HowToDirection rdfs:subClassOf schema:CreativeWork,
+        schema:ListItem .
+
+schema:HowToSection rdfs:subClassOf schema:CreativeWork,
+        schema:ItemList,
+        schema:ListItem .
+
+schema:HowToStep rdfs:subClassOf schema:CreativeWork,
+        schema:ItemList,
+        schema:ListItem .
+
+schema:HowToSupply rdfs:subClassOf schema:HowToItem .
+
+schema:HowToTip rdfs:subClassOf schema:CreativeWork,
+        schema:ListItem .
+
+schema:HowToTool rdfs:subClassOf schema:HowToItem .
+
+schema:HyperToc rdfs:subClassOf schema:CreativeWork .
+
+schema:HyperTocEntry rdfs:subClassOf schema:CreativeWork .
+
+schema:IPTCDigitalSourceEnumeration rdfs:subClassOf schema:MediaEnumeration .
+
+schema:ITNonprofitType rdfs:subClassOf schema:NonprofitType .
+
+schema:IceCreamShop rdfs:subClassOf schema:FoodEstablishment .
+
+schema:IgnoreAction rdfs:subClassOf schema:AssessAction .
+
+schema:ImageGallery rdfs:subClassOf schema:MediaGallery .
+
+schema:ImageObjectSnapshot rdfs:subClassOf schema:ImageObject .
+
+schema:ImagingTest rdfs:subClassOf schema:MedicalTest .
+
+schema:IncentiveQualifiedExpenseType rdfs:subClassOf schema:Enumeration .
+
+schema:IncentiveStatus rdfs:subClassOf schema:Enumeration .
+
+schema:IncentiveType rdfs:subClassOf schema:Enumeration .
+
+schema:IndividualPhysician rdfs:subClassOf schema:Physician .
+
+schema:IndividualProduct rdfs:subClassOf schema:Product .
+
+schema:InfectiousAgentClass rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:InfectiousDisease rdfs:subClassOf schema:MedicalCondition .
+
+schema:InstallAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:InsuranceAgency rdfs:subClassOf schema:FinancialService .
+
+schema:Integer rdfs:subClassOf schema:Number .
+
+schema:InteractionCounter rdfs:subClassOf schema:StructuredValue .
+
+schema:InternetCafe rdfs:subClassOf schema:LocalBusiness .
+
+schema:InvestmentFund rdfs:subClassOf schema:InvestmentOrDeposit .
+
+schema:InviteAction rdfs:subClassOf schema:CommunicateAction .
+
+schema:Invoice rdfs:subClassOf schema:Intangible,
+        <https://spec.edmcouncil.org/fibo/ontology/FND/Arrangements/Documents/LegalDocument> .
+
+schema:ItemAvailability rdfs:subClassOf schema:Enumeration .
+
+schema:ItemListOrderType rdfs:subClassOf schema:Enumeration .
+
+schema:ItemPage rdfs:subClassOf schema:WebPage .
+
+schema:JewelryStore rdfs:subClassOf schema:Store .
+
+schema:JobPosting rdfs:subClassOf schema:Intangible .
+
+schema:JoinAction rdfs:subClassOf schema:InteractAction .
+
+schema:Joint rdfs:subClassOf schema:AnatomicalStructure .
+
+schema:LakeBodyOfWater rdfs:subClassOf schema:BodyOfWater .
+
+schema:LandmarksOrHistoricalBuildings rdfs:subClassOf schema:Place .
+
+schema:Language rdfs:subClassOf schema:Intangible .
+
+schema:LeaveAction rdfs:subClassOf schema:InteractAction .
+
+schema:LegalForceStatus rdfs:subClassOf schema:StatusEnumeration .
+
+schema:LegalValueLevel rdfs:subClassOf schema:Enumeration .
+
+schema:LegislationObject rdfs:subClassOf schema:Legislation,
+        schema:MediaObject .
+
+schema:LegislativeBuilding rdfs:subClassOf schema:GovernmentBuilding .
+
+schema:LendAction rdfs:subClassOf schema:TransferAction .
+
+schema:Library rdfs:subClassOf schema:LocalBusiness .
+
+schema:LibrarySystem rdfs:subClassOf schema:Organization .
+
+schema:Ligament rdfs:subClassOf schema:AnatomicalStructure .
+
+schema:LikeAction rdfs:subClassOf schema:ReactAction .
+
+schema:LinkRole rdfs:subClassOf schema:Role .
+
+schema:LiquorStore rdfs:subClassOf schema:Store .
+
+schema:ListenAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:LiteraryEvent rdfs:subClassOf schema:Event .
+
+schema:LiveBlogPosting rdfs:subClassOf schema:BlogPosting .
+
+schema:LocationFeatureSpecification rdfs:subClassOf schema:PropertyValue .
+
+schema:Locksmith rdfs:subClassOf schema:HomeAndConstructionBusiness .
+
+schema:LodgingReservation rdfs:subClassOf schema:Reservation .
+
+schema:LoginAction rdfs:subClassOf schema:ControlAction .
+
+schema:LoseAction rdfs:subClassOf schema:AchieveAction .
+
+schema:LymphaticVessel rdfs:subClassOf schema:Vessel .
+
+schema:Manuscript rdfs:subClassOf schema:CreativeWork .
+
+schema:Map rdfs:subClassOf schema:CreativeWork .
+
+schema:MapCategoryType rdfs:subClassOf schema:Enumeration .
+
+schema:MarryAction rdfs:subClassOf schema:InteractAction .
+
+schema:Mass rdfs:subClassOf schema:Quantity .
+
+schema:MathSolver rdfs:subClassOf schema:CreativeWork .
+
+schema:MaximumDoseSchedule rdfs:subClassOf schema:DoseSchedule .
+
+schema:MeasurementMethodEnum rdfs:subClassOf schema:Enumeration .
+
+schema:MediaManipulationRatingEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:MediaReview rdfs:subClassOf schema:Review .
+
+schema:MediaReviewItem rdfs:subClassOf schema:CreativeWork .
+
+schema:MediaSubscription rdfs:subClassOf schema:Intangible .
+
+schema:MedicalAudienceType rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MedicalCause rdfs:subClassOf schema:MedicalEntity .
+
+schema:MedicalCode rdfs:subClassOf schema:CategoryCode,
+        schema:MedicalIntangible .
+
+schema:MedicalConditionStage rdfs:subClassOf schema:MedicalIntangible .
+
+schema:MedicalContraindication rdfs:subClassOf schema:MedicalEntity .
+
+schema:MedicalDevice rdfs:subClassOf schema:MedicalEntity .
+
+schema:MedicalDevicePurpose rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MedicalEvidenceLevel rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MedicalGuidelineContraindication rdfs:subClassOf schema:MedicalGuideline .
+
+schema:MedicalGuidelineRecommendation rdfs:subClassOf schema:MedicalGuideline .
+
+schema:MedicalImagingTechnique rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MedicalObservationalStudy rdfs:subClassOf schema:MedicalStudy .
+
+schema:MedicalObservationalStudyDesign rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MedicalProcedureType rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MedicalRiskCalculator rdfs:subClassOf schema:MedicalRiskEstimator .
+
+schema:MedicalRiskFactor rdfs:subClassOf schema:MedicalEntity .
+
+schema:MedicalRiskScore rdfs:subClassOf schema:MedicalRiskEstimator .
+
+schema:MedicalScholarlyArticle rdfs:subClassOf schema:ScholarlyArticle .
+
+schema:MedicalSpecialty rdfs:subClassOf schema:MedicalEnumeration,
+        schema:Specialty .
+
+schema:MedicalStudyStatus rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MedicalSymptom rdfs:subClassOf schema:MedicalSignOrSymptom .
+
+schema:MedicalTestPanel rdfs:subClassOf schema:MedicalTest .
+
+schema:MedicalTrial rdfs:subClassOf schema:MedicalStudy .
+
+schema:MedicalTrialDesign rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MedicalWebPage rdfs:subClassOf schema:WebPage .
+
+schema:MedicineSystem rdfs:subClassOf schema:MedicalEnumeration .
+
+schema:MeetingRoom rdfs:subClassOf schema:Room .
+
+schema:MemberProgram rdfs:subClassOf schema:Intangible .
+
+schema:MemberProgramTier rdfs:subClassOf schema:Intangible .
+
+schema:MensClothingStore rdfs:subClassOf schema:Store .
+
+schema:Menu rdfs:subClassOf schema:CreativeWork .
+
+schema:MenuItem rdfs:subClassOf schema:Intangible .
+
+schema:MenuSection rdfs:subClassOf schema:CreativeWork .
+
+schema:MerchantReturnEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:MerchantReturnPolicy rdfs:subClassOf schema:Intangible .
+
+schema:MerchantReturnPolicySeasonalOverride rdfs:subClassOf schema:Intangible .
+
+schema:MiddleSchool rdfs:subClassOf schema:EducationalOrganization .
+
+schema:Midwifery rdfs:subClassOf schema:MedicalBusiness .
+
+schema:MobileApplication rdfs:subClassOf schema:SoftwareApplication .
+
+schema:MobilePhoneStore rdfs:subClassOf schema:Store .
+
+schema:MolecularEntity rdfs:subClassOf schema:BioChemEntity .
+
+schema:MonetaryAmount rdfs:subClassOf schema:StructuredValue .
+
+schema:MonetaryAmountDistribution rdfs:subClassOf schema:QuantitativeValueDistribution .
+
+schema:MonetaryGrant rdfs:subClassOf schema:Grant .
+
+schema:MoneyTransfer rdfs:subClassOf schema:TransferAction .
+
+schema:MortgageLoan rdfs:subClassOf schema:LoanOrCredit .
+
+schema:Mosque rdfs:subClassOf schema:PlaceOfWorship .
+
+schema:Motel rdfs:subClassOf schema:LodgingBusiness .
+
+schema:Motorcycle rdfs:subClassOf schema:Vehicle .
+
+schema:MotorcycleDealer rdfs:subClassOf schema:AutomotiveBusiness .
+
+schema:MotorcycleRepair rdfs:subClassOf schema:AutomotiveBusiness .
+
+schema:MotorizedBicycle rdfs:subClassOf schema:Vehicle .
+
+schema:Mountain rdfs:subClassOf schema:Landform .
+
+schema:Movie rdfs:subClassOf schema:CreativeWork .
+
+schema:MovieClip rdfs:subClassOf schema:Clip .
+
+schema:MovieRentalStore rdfs:subClassOf schema:Store .
+
+schema:MovieSeries rdfs:subClassOf schema:CreativeWorkSeries .
+
+schema:MovieTheater rdfs:subClassOf schema:CivicStructure,
+        schema:EntertainmentBusiness .
+
+schema:MovingCompany rdfs:subClassOf schema:HomeAndConstructionBusiness .
+
+schema:Muscle rdfs:subClassOf schema:AnatomicalStructure .
+
+schema:Museum rdfs:subClassOf schema:CivicStructure .
+
+schema:MusicAlbum rdfs:subClassOf schema:MusicPlaylist .
+
+schema:MusicAlbumProductionType rdfs:subClassOf schema:Enumeration .
+
+schema:MusicAlbumReleaseType rdfs:subClassOf schema:Enumeration .
+
+schema:MusicComposition rdfs:subClassOf schema:CreativeWork .
+
+schema:MusicEvent rdfs:subClassOf schema:Event .
+
+schema:MusicGroup rdfs:subClassOf schema:PerformingGroup .
+
+schema:MusicRecording rdfs:subClassOf schema:CreativeWork .
+
+schema:MusicRelease rdfs:subClassOf schema:MusicPlaylist .
+
+schema:MusicReleaseFormatType rdfs:subClassOf schema:Enumeration .
+
+schema:MusicStore rdfs:subClassOf schema:Store .
+
+schema:MusicVenue rdfs:subClassOf schema:CivicStructure .
+
+schema:MusicVideoObject rdfs:subClassOf schema:MediaObject .
+
+schema:NGO rdfs:subClassOf schema:Organization .
+
+schema:NLNonprofitType rdfs:subClassOf schema:NonprofitType .
+
+schema:NailSalon rdfs:subClassOf schema:HealthAndBeautyBusiness .
+
+schema:Nerve rdfs:subClassOf schema:AnatomicalStructure .
+
+schema:NewsMediaOrganization rdfs:subClassOf schema:Organization .
+
+schema:Newspaper rdfs:subClassOf schema:Periodical .
+
+schema:NightClub rdfs:subClassOf schema:EntertainmentBusiness .
+
+schema:Notary rdfs:subClassOf schema:LegalService .
+
+schema:NoteDigitalDocument rdfs:subClassOf schema:DigitalDocument .
+
+schema:Nursing rdfs:subClassOf schema:MedicalBusiness .
+
+schema:NutritionInformation rdfs:subClassOf schema:StructuredValue .
+
+schema:Observation rdfs:subClassOf schema:Intangible,
+        schema:QuantitativeValue .
+
+schema:Obstetric rdfs:subClassOf schema:MedicalBusiness .
+
+schema:Occupation rdfs:subClassOf schema:Intangible .
+
+schema:OccupationalExperienceRequirements rdfs:subClassOf schema:Intangible .
+
+schema:OccupationalTherapy rdfs:subClassOf schema:MedicalTherapy .
+
+schema:OceanBodyOfWater rdfs:subClassOf schema:BodyOfWater .
+
+schema:OfferCatalog rdfs:subClassOf schema:ItemList .
+
+schema:OfferForLease rdfs:subClassOf schema:Offer .
+
+schema:OfferForPurchase rdfs:subClassOf schema:Offer .
+
+schema:OfferItemCondition rdfs:subClassOf schema:Enumeration .
+
+schema:OfferShippingDetails rdfs:subClassOf schema:StructuredValue .
+
+schema:OfficeEquipmentStore rdfs:subClassOf schema:Store .
+
+schema:OnDemandEvent rdfs:subClassOf schema:PublicationEvent .
+
+schema:Oncologic rdfs:subClassOf schema:MedicalBusiness .
+
+schema:OnlineMarketplace rdfs:subClassOf schema:OnlineStore .
+
+schema:OpeningHoursSpecification rdfs:subClassOf schema:StructuredValue .
+
+schema:OperatingSystem rdfs:subClassOf schema:SoftwareApplication .
+
+schema:Ophthalmology rdfs:subClassOf schema:MedicalBusiness .
+
+schema:OpinionNewsArticle rdfs:subClassOf schema:NewsArticle .
+
+schema:Optician rdfs:subClassOf schema:MedicalBusiness .
+
+schema:Optometric rdfs:subClassOf schema:MedicalBusiness .
+
+schema:Order rdfs:subClassOf schema:Intangible,
+        <https://spec.edmcouncil.org/fibo/ontology/FND/Arrangements/Documents/LegalDocument> .
+
+schema:OrderAction rdfs:subClassOf schema:TradeAction .
+
+schema:OrderItem rdfs:subClassOf schema:StructuredValue .
+
+schema:OrderStatus rdfs:subClassOf schema:StatusEnumeration .
+
+schema:Otolaryngologic rdfs:subClassOf schema:MedicalBusiness .
+
+schema:OutletStore rdfs:subClassOf schema:Store .
+
+schema:OwnershipInfo rdfs:subClassOf schema:StructuredValue .
+
+schema:PaintAction rdfs:subClassOf schema:CreateAction .
+
+schema:Painting rdfs:subClassOf schema:CreativeWork .
+
+schema:PalliativeProcedure rdfs:subClassOf schema:MedicalProcedure,
+        schema:MedicalTherapy .
+
+schema:ParcelDelivery rdfs:subClassOf schema:Intangible .
+
+schema:ParentAudience rdfs:subClassOf schema:PeopleAudience .
+
+schema:Park rdfs:subClassOf schema:CivicStructure .
+
+schema:ParkingFacility rdfs:subClassOf schema:CivicStructure .
+
+schema:PathologyTest rdfs:subClassOf schema:MedicalTest .
+
+schema:Patient rdfs:subClassOf schema:MedicalAudience,
+        schema:Person .
+
+schema:PawnShop rdfs:subClassOf schema:Store .
+
+schema:PayAction rdfs:subClassOf schema:TradeAction .
+
+schema:PaymentChargeSpecification rdfs:subClassOf schema:PriceSpecification .
+
+schema:PaymentMethodType rdfs:subClassOf schema:Enumeration .
+
+schema:PaymentService rdfs:subClassOf schema:FinancialProduct,
+        schema:PaymentMethod .
+
+schema:PaymentStatusType rdfs:subClassOf schema:StatusEnumeration .
+
+schema:Pediatric rdfs:subClassOf schema:MedicalBusiness .
+
+schema:PerformAction rdfs:subClassOf schema:PlayAction .
+
+schema:PerformanceRole rdfs:subClassOf schema:Role .
+
+schema:PerformingArtsEvent rdfs:subClassOf schema:Event .
+
+schema:PerformingArtsTheater rdfs:subClassOf schema:CivicStructure .
+
+schema:PetStore rdfs:subClassOf schema:Store .
+
+schema:Pharmacy rdfs:subClassOf schema:MedicalBusiness,
+        schema:MedicalOrganization .
+
+schema:Photograph rdfs:subClassOf schema:CreativeWork .
+
+schema:PhotographAction rdfs:subClassOf schema:CreateAction .
+
+schema:PhysicalActivityCategory rdfs:subClassOf schema:Enumeration .
+
+schema:PhysicalExam rdfs:subClassOf schema:MedicalEnumeration,
+        schema:MedicalProcedure .
+
+schema:PhysicalTherapy rdfs:subClassOf schema:MedicalTherapy .
+
+schema:PhysiciansOffice rdfs:subClassOf schema:Physician .
+
+schema:Physiotherapy rdfs:subClassOf schema:MedicalBusiness .
+
+schema:PlasticSurgery rdfs:subClassOf schema:MedicalBusiness .
+
+schema:Play rdfs:subClassOf schema:CreativeWork .
+
+schema:PlayGameAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:Playground rdfs:subClassOf schema:CivicStructure .
+
+schema:Plumber rdfs:subClassOf schema:HomeAndConstructionBusiness .
+
+schema:PodcastEpisode rdfs:subClassOf schema:Episode .
+
+schema:PodcastSeason rdfs:subClassOf schema:CreativeWorkSeason .
+
+schema:PodcastSeries rdfs:subClassOf schema:CreativeWorkSeries .
+
+schema:Podiatric rdfs:subClassOf schema:MedicalBusiness .
+
+schema:PoliceStation rdfs:subClassOf schema:CivicStructure,
+        schema:EmergencyService .
+
+schema:PoliticalParty rdfs:subClassOf schema:Organization .
+
+schema:Pond rdfs:subClassOf schema:BodyOfWater .
+
+schema:PostOffice rdfs:subClassOf schema:GovernmentOffice .
+
+schema:PostalAddress rdfs:subClassOf schema:ContactPoint .
+
+schema:PostalCodeRangeSpecification rdfs:subClassOf schema:StructuredValue .
+
+schema:Poster rdfs:subClassOf schema:CreativeWork .
+
+schema:PreOrderAction rdfs:subClassOf schema:TradeAction .
+
+schema:PrependAction rdfs:subClassOf schema:InsertAction .
+
+schema:Preschool rdfs:subClassOf schema:EducationalOrganization .
+
+schema:PresentationDigitalDocument rdfs:subClassOf schema:DigitalDocument .
+
+schema:PreventionIndication rdfs:subClassOf schema:MedicalIndication .
+
+schema:PriceComponentTypeEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:PriceTypeEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:PrimaryCare rdfs:subClassOf schema:MedicalBusiness .
+
+schema:ProductCollection rdfs:subClassOf schema:Collection,
+        schema:Product .
+
+schema:ProductGroup rdfs:subClassOf schema:Product,
+        <https://www.omg.org/spec/Commons/Classifiers/Classifier>,
+        <https://www.omg.org/spec/Commons/Collections/Collection> .
+
+schema:ProductModel rdfs:subClassOf schema:Product .
+
+schema:ProductReturnEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:ProductReturnPolicy rdfs:subClassOf schema:Intangible .
+
+schema:ProfessionalService rdfs:subClassOf schema:LocalBusiness .
+
+schema:ProfilePage rdfs:subClassOf schema:WebPage .
+
+schema:ProgramMembership rdfs:subClassOf schema:Intangible .
+
+schema:PronounceableText rdfs:subClassOf schema:Text .
+
+schema:Property rdfs:subClassOf schema:Intangible .
+
+schema:PropertyValueSpecification rdfs:subClassOf schema:Intangible .
+
+schema:Protein rdfs:subClassOf schema:BioChemEntity .
+
+schema:Psychiatric rdfs:subClassOf schema:MedicalBusiness .
+
+schema:PsychologicalTreatment rdfs:subClassOf schema:TherapeuticProcedure .
+
+schema:PublicHealth rdfs:subClassOf schema:MedicalBusiness .
+
+schema:PublicSwimmingPool rdfs:subClassOf schema:SportsActivityLocation .
+
+schema:PublicToilet rdfs:subClassOf schema:CivicStructure .
+
+schema:PublicationVolume rdfs:subClassOf schema:CreativeWork .
+
+schema:PurchaseType rdfs:subClassOf schema:Enumeration .
+
+schema:QAPage rdfs:subClassOf schema:WebPage .
+
+schema:Question rdfs:subClassOf schema:Comment .
+
+schema:Quiz rdfs:subClassOf schema:LearningResource .
+
+schema:Quotation rdfs:subClassOf schema:CreativeWork .
+
+schema:QuoteAction rdfs:subClassOf schema:TradeAction .
+
+schema:RVPark rdfs:subClassOf schema:CivicStructure .
+
+schema:RadiationTherapy rdfs:subClassOf schema:MedicalTherapy .
+
+schema:RadioBroadcastService rdfs:subClassOf schema:BroadcastService .
+
+schema:RadioClip rdfs:subClassOf schema:Clip .
+
+schema:RadioEpisode rdfs:subClassOf schema:Episode .
+
+schema:RadioSeason rdfs:subClassOf schema:CreativeWorkSeason .
+
+schema:RadioSeries rdfs:subClassOf schema:CreativeWorkSeries .
+
+schema:RadioStation rdfs:subClassOf schema:LocalBusiness .
+
+schema:ReadAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:RealEstateAgent rdfs:subClassOf schema:LocalBusiness .
+
+schema:RealEstateListing rdfs:subClassOf schema:WebPage .
+
+schema:ReceiveAction rdfs:subClassOf schema:TransferAction .
+
+schema:Recipe rdfs:subClassOf schema:HowTo .
+
+schema:Recommendation rdfs:subClassOf schema:Review .
+
+schema:RecommendedDoseSchedule rdfs:subClassOf schema:DoseSchedule .
+
+schema:RecyclingCenter rdfs:subClassOf schema:LocalBusiness .
+
+schema:RefundTypeEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:RegisterAction rdfs:subClassOf schema:InteractAction .
+
+schema:RejectAction rdfs:subClassOf schema:AllocateAction .
+
+schema:RentAction rdfs:subClassOf schema:TradeAction .
+
+schema:RentalCarReservation rdfs:subClassOf schema:Reservation .
+
+schema:RepaymentSpecification rdfs:subClassOf schema:StructuredValue .
+
+schema:ReplaceAction rdfs:subClassOf schema:UpdateAction .
+
+schema:ReplyAction rdfs:subClassOf schema:CommunicateAction .
+
+schema:Report rdfs:subClassOf schema:Article .
+
+schema:ReportageNewsArticle rdfs:subClassOf schema:NewsArticle .
+
+schema:ReportedDoseSchedule rdfs:subClassOf schema:DoseSchedule .
+
+schema:ResearchOrganization rdfs:subClassOf schema:Organization .
+
+schema:ResearchProject rdfs:subClassOf schema:Project .
+
+schema:Researcher rdfs:subClassOf schema:Audience .
+
+schema:ReservationPackage rdfs:subClassOf schema:Reservation .
+
+schema:ReservationStatusType rdfs:subClassOf schema:StatusEnumeration .
+
+schema:ReserveAction rdfs:subClassOf schema:PlanAction .
+
+schema:Reservoir rdfs:subClassOf schema:BodyOfWater .
+
+schema:ResetPasswordAction rdfs:subClassOf schema:ControlAction .
+
+schema:RespiratoryTherapy rdfs:subClassOf schema:MedicalTherapy .
+
+schema:Restaurant rdfs:subClassOf schema:FoodEstablishment .
+
+schema:RestrictedDiet rdfs:subClassOf schema:Enumeration .
+
+schema:ResumeAction rdfs:subClassOf schema:ControlAction .
+
+schema:ReturnAction rdfs:subClassOf schema:TransferAction .
+
+schema:ReturnFeesEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:ReturnLabelSourceEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:ReturnMethodEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:ReviewAction rdfs:subClassOf schema:AssessAction .
+
+schema:ReviewNewsArticle rdfs:subClassOf schema:CriticReview,
+        schema:NewsArticle .
+
+schema:RiverBodyOfWater rdfs:subClassOf schema:BodyOfWater .
+
+schema:RoofingContractor rdfs:subClassOf schema:HomeAndConstructionBusiness .
+
+schema:RsvpAction rdfs:subClassOf schema:InformAction .
+
+schema:RsvpResponseType rdfs:subClassOf schema:Enumeration .
+
+schema:RuntimePlatform rdfs:subClassOf schema:SoftwareApplication .
+
+schema:SaleEvent rdfs:subClassOf schema:Event .
+
+schema:SatiricalArticle rdfs:subClassOf schema:Article .
+
+schema:Schedule rdfs:subClassOf schema:Intangible .
+
+schema:ScheduleAction rdfs:subClassOf schema:PlanAction .
+
+schema:School rdfs:subClassOf schema:EducationalOrganization .
+
+schema:SchoolDistrict rdfs:subClassOf schema:AdministrativeArea .
+
+schema:ScreeningEvent rdfs:subClassOf schema:Event .
+
+schema:Sculpture rdfs:subClassOf schema:CreativeWork .
+
+schema:SeaBodyOfWater rdfs:subClassOf schema:BodyOfWater .
+
+schema:SearchAction rdfs:subClassOf schema:Action .
+
+schema:SearchRescueOrganization rdfs:subClassOf schema:Organization .
+
+schema:SearchResultsPage rdfs:subClassOf schema:WebPage .
+
+schema:Season rdfs:subClassOf schema:CreativeWork .
+
+schema:Seat rdfs:subClassOf schema:Intangible .
+
+schema:SeekToAction rdfs:subClassOf schema:Action .
+
+schema:SelfStorage rdfs:subClassOf schema:LocalBusiness .
+
+schema:SellAction rdfs:subClassOf schema:TradeAction .
+
+schema:SendAction rdfs:subClassOf schema:TransferAction .
+
+schema:SequentialArt rdfs:subClassOf schema:Book,
+        schema:VisualArtwork .
+
+schema:ServiceChannel rdfs:subClassOf schema:Intangible .
+
+schema:ServicePeriod rdfs:subClassOf schema:StructuredValue .
+
+schema:ShareAction rdfs:subClassOf schema:CommunicateAction .
+
+schema:SheetMusic rdfs:subClassOf schema:CreativeWork .
+
+schema:ShippingConditions rdfs:subClassOf schema:StructuredValue .
+
+schema:ShippingDeliveryTime rdfs:subClassOf schema:StructuredValue .
+
+schema:ShippingRateSettings rdfs:subClassOf schema:StructuredValue .
+
+schema:ShippingService rdfs:subClassOf schema:StructuredValue .
+
+schema:ShoeStore rdfs:subClassOf schema:Store .
+
+schema:ShoppingCenter rdfs:subClassOf schema:LocalBusiness .
+
+schema:ShortStory rdfs:subClassOf schema:CreativeWork .
+
+schema:SingleFamilyResidence rdfs:subClassOf schema:House .
+
+schema:SiteNavigationElement rdfs:subClassOf schema:WebPageElement .
+
+schema:SizeSpecification rdfs:subClassOf schema:QualitativeValue .
+
+schema:SkiResort rdfs:subClassOf schema:Resort,
+        schema:SportsActivityLocation .
+
+schema:SocialEvent rdfs:subClassOf schema:Event .
+
+schema:SoftwareSourceCode rdfs:subClassOf schema:CreativeWork .
+
+schema:SolveMathAction rdfs:subClassOf schema:Action .
+
+schema:SomeProducts rdfs:subClassOf schema:Product .
+
+schema:SpeakableSpecification rdfs:subClassOf schema:Intangible .
+
+schema:SpecialAnnouncement rdfs:subClassOf schema:CreativeWork .
+
+schema:SportingGoodsStore rdfs:subClassOf schema:Store .
+
+schema:SportsClub rdfs:subClassOf schema:SportsActivityLocation .
+
+schema:SportsEvent rdfs:subClassOf schema:Event .
+
+schema:SportsTeam rdfs:subClassOf schema:SportsOrganization .
+
+schema:SpreadsheetDigitalDocument rdfs:subClassOf schema:DigitalDocument .
+
+schema:StadiumOrArena rdfs:subClassOf schema:CivicStructure,
+        schema:SportsActivityLocation .
+
+schema:State rdfs:subClassOf schema:AdministrativeArea .
+
+schema:Statement rdfs:subClassOf schema:CreativeWork .
+
+schema:StatisticalPopulation rdfs:subClassOf schema:Intangible .
+
+schema:StatisticalVariable rdfs:subClassOf schema:ConstraintNode .
+
+schema:SteeringPositionValue rdfs:subClassOf schema:QualitativeValue .
+
+schema:StupidType rdfs:subClassOf schema:Thing .
+
+schema:SubscribeAction rdfs:subClassOf schema:InteractAction .
+
+schema:SubwayStation rdfs:subClassOf schema:CivicStructure .
+
+schema:Suite rdfs:subClassOf schema:Accommodation .
+
+schema:SuperficialAnatomy rdfs:subClassOf schema:MedicalEntity .
+
+schema:SurgicalProcedure rdfs:subClassOf schema:MedicalProcedure .
+
+schema:SuspendAction rdfs:subClassOf schema:ControlAction .
+
+schema:Syllabus rdfs:subClassOf schema:LearningResource .
+
+schema:Synagogue rdfs:subClassOf schema:PlaceOfWorship .
+
+schema:TVClip rdfs:subClassOf schema:Clip .
+
+schema:TVEpisode rdfs:subClassOf schema:Episode .
+
+schema:TVSeason rdfs:subClassOf schema:CreativeWork,
+        schema:CreativeWorkSeason .
+
+schema:TVSeries rdfs:subClassOf schema:CreativeWork,
+        schema:CreativeWorkSeries .
+
+schema:Table rdfs:subClassOf schema:WebPageElement .
+
+schema:TakeAction rdfs:subClassOf schema:TransferAction .
+
+schema:TattooParlor rdfs:subClassOf schema:HealthAndBeautyBusiness .
+
+schema:Taxi rdfs:subClassOf schema:Service .
+
+schema:TaxiReservation rdfs:subClassOf schema:Reservation .
+
+schema:TaxiService rdfs:subClassOf schema:Service .
+
+schema:TaxiStand rdfs:subClassOf schema:CivicStructure .
+
+schema:Taxon rdfs:subClassOf schema:Thing .
+
+schema:TelevisionChannel rdfs:subClassOf schema:BroadcastChannel .
+
+schema:TelevisionStation rdfs:subClassOf schema:LocalBusiness .
+
+schema:TennisComplex rdfs:subClassOf schema:SportsActivityLocation .
+
+schema:TextDigitalDocument rdfs:subClassOf schema:DigitalDocument .
+
+schema:TextObject rdfs:subClassOf schema:MediaObject .
+
+schema:TheaterEvent rdfs:subClassOf schema:Event .
+
+schema:TheaterGroup rdfs:subClassOf schema:PerformingGroup .
+
+schema:Thesis rdfs:subClassOf schema:CreativeWork .
+
+schema:Ticket rdfs:subClassOf schema:Intangible .
+
+schema:TieAction rdfs:subClassOf schema:AchieveAction .
+
+schema:TierBenefitEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:TipAction rdfs:subClassOf schema:TradeAction .
+
+schema:TireShop rdfs:subClassOf schema:Store .
+
+schema:TouristAttraction rdfs:subClassOf schema:Place .
+
+schema:TouristDestination rdfs:subClassOf schema:Place .
+
+schema:TouristInformationCenter rdfs:subClassOf schema:LocalBusiness .
+
+schema:TouristTrip rdfs:subClassOf schema:Trip .
+
+schema:ToyStore rdfs:subClassOf schema:Store .
+
+schema:TrackAction rdfs:subClassOf schema:FindAction .
+
+schema:TrainReservation rdfs:subClassOf schema:Reservation .
+
+schema:TrainStation rdfs:subClassOf schema:CivicStructure .
+
+schema:TrainTrip rdfs:subClassOf schema:Trip .
+
+schema:TravelAction rdfs:subClassOf schema:MoveAction .
+
+schema:TravelAgency rdfs:subClassOf schema:LocalBusiness .
+
+schema:TreatmentIndication rdfs:subClassOf schema:MedicalIndication .
+
+schema:TypeAndQuantityNode rdfs:subClassOf schema:StructuredValue .
+
+schema:UKNonprofitType rdfs:subClassOf schema:NonprofitType .
+
+schema:URL rdfs:subClassOf schema:Text .
+
+schema:USNonprofitType rdfs:subClassOf schema:NonprofitType .
+
+schema:UnRegisterAction rdfs:subClassOf schema:InteractAction .
+
+schema:UnitPriceSpecification rdfs:subClassOf schema:PriceSpecification .
+
+schema:UserBlocks rdfs:subClassOf schema:UserInteraction .
+
+schema:UserCheckins rdfs:subClassOf schema:UserInteraction .
+
+schema:UserComments rdfs:subClassOf schema:UserInteraction .
+
+schema:UserDownloads rdfs:subClassOf schema:UserInteraction .
+
+schema:UserLikes rdfs:subClassOf schema:UserInteraction .
+
+schema:UserPageVisits rdfs:subClassOf schema:UserInteraction .
+
+schema:UserPlays rdfs:subClassOf schema:UserInteraction .
+
+schema:UserPlusOnes rdfs:subClassOf schema:UserInteraction .
+
+schema:UserReview rdfs:subClassOf schema:Review .
+
+schema:UserTweets rdfs:subClassOf schema:UserInteraction .
+
+schema:VacationRental rdfs:subClassOf schema:LodgingBusiness .
+
+schema:Vein rdfs:subClassOf schema:Vessel .
+
+schema:VeterinaryCare rdfs:subClassOf schema:MedicalOrganization .
+
+schema:VideoGallery rdfs:subClassOf schema:MediaGallery .
+
+schema:VideoGame rdfs:subClassOf schema:Game,
+        schema:SoftwareApplication .
+
+schema:VideoGameClip rdfs:subClassOf schema:Clip .
+
+schema:VideoGameSeries rdfs:subClassOf schema:CreativeWorkSeries .
+
+schema:VideoObjectSnapshot rdfs:subClassOf schema:VideoObject .
+
+schema:ViewAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:VirtualLocation rdfs:subClassOf schema:Intangible .
+
+schema:VisualArtsEvent rdfs:subClassOf schema:Event .
+
+schema:VitalSign rdfs:subClassOf schema:MedicalSign .
+
+schema:Volcano rdfs:subClassOf schema:Landform .
+
+schema:VoteAction rdfs:subClassOf schema:ChooseAction .
+
+schema:WPAdBlock rdfs:subClassOf schema:WebPageElement .
+
+schema:WPFooter rdfs:subClassOf schema:WebPageElement .
+
+schema:WPHeader rdfs:subClassOf schema:WebPageElement .
+
+schema:WPSideBar rdfs:subClassOf schema:WebPageElement .
+
+schema:WantAction rdfs:subClassOf schema:ReactAction .
+
+schema:WarrantyPromise rdfs:subClassOf schema:StructuredValue,
+        <https://spec.edmcouncil.org/fibo/ontology/FND/Agreements/Contracts/MutualContractualAgreement> .
+
+schema:WarrantyScope rdfs:subClassOf schema:Enumeration .
+
+schema:WatchAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:Waterfall rdfs:subClassOf schema:BodyOfWater .
+
+schema:WearAction rdfs:subClassOf schema:UseAction .
+
+schema:WearableMeasurementTypeEnumeration rdfs:subClassOf schema:MeasurementTypeEnumeration .
+
+schema:WearableSizeGroupEnumeration rdfs:subClassOf schema:SizeGroupEnumeration .
+
+schema:WearableSizeSystemEnumeration rdfs:subClassOf schema:SizeSystemEnumeration .
+
+schema:WebAPI rdfs:subClassOf schema:Service .
+
+schema:WebApplication rdfs:subClassOf schema:SoftwareApplication .
+
+schema:WebSite rdfs:subClassOf schema:CreativeWork .
+
+schema:WholesaleStore rdfs:subClassOf schema:Store .
+
+schema:WinAction rdfs:subClassOf schema:AchieveAction .
+
+schema:Winery rdfs:subClassOf schema:FoodEstablishment .
+
+schema:WorkBasedProgram rdfs:subClassOf schema:EducationalOccupationalProgram .
+
+schema:WorkersUnion rdfs:subClassOf schema:Organization .
+
+schema:WriteAction rdfs:subClassOf schema:CreateAction .
+
+schema:XPathType rdfs:subClassOf schema:Text .
+
+schema:Zoo rdfs:subClassOf schema:CivicStructure .
+
+schema:AddAction rdfs:subClassOf schema:UpdateAction .
+
+schema:AggregateRating rdfs:subClassOf schema:Rating .
+
+schema:BankAccount rdfs:subClassOf schema:FinancialProduct .
+
+schema:BlogPosting rdfs:subClassOf schema:SocialMediaPosting .
+
+schema:BroadcastService rdfs:subClassOf schema:Service .
+
+schema:CategoryCode rdfs:subClassOf schema:DefinedTerm .
+
+schema:ChooseAction rdfs:subClassOf schema:AssessAction .
+
+schema:Church rdfs:subClassOf schema:PlaceOfWorship .
+
+schema:Collection rdfs:subClassOf schema:CreativeWork .
+
+schema:CollectionPage rdfs:subClassOf schema:WebPage .
+
+schema:ComicStory rdfs:subClassOf schema:CreativeWork .
+
+schema:ConstraintNode rdfs:subClassOf schema:Intangible .
+
+schema:ContactPoint rdfs:subClassOf schema:StructuredValue .
+
+schema:CoverArt rdfs:subClassOf schema:VisualArtwork .
+
+schema:Credential rdfs:subClassOf schema:CreativeWork .
+
+schema:CriticReview rdfs:subClassOf schema:Review .
+
+schema:DataFeed rdfs:subClassOf schema:Dataset .
+
+schema:Dataset rdfs:subClassOf schema:CreativeWork .
+
+schema:DefinedTerm rdfs:subClassOf schema:Intangible .
+
+schema:DefinedTermSet rdfs:subClassOf schema:CreativeWork .
+
+schema:EducationalOccupationalProgram rdfs:subClassOf schema:Intangible .
+
+schema:Game rdfs:subClassOf schema:CreativeWork .
+
+schema:GeoShape rdfs:subClassOf schema:StructuredValue .
+
+schema:GovernmentOffice rdfs:subClassOf schema:LocalBusiness .
+
+schema:Grant rdfs:subClassOf schema:Intangible .
+
+schema:House rdfs:subClassOf schema:Accommodation .
+
+schema:HowTo rdfs:subClassOf schema:CreativeWork .
+
+schema:InstantaneousEvent rdfs:subClassOf schema:StructuredValue .
+
+schema:Legislation rdfs:subClassOf schema:CreativeWork .
+
+schema:MediaEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:MedicalAudience rdfs:subClassOf schema:Audience,
+        schema:PeopleAudience .
+
+schema:MedicalClinic rdfs:subClassOf schema:MedicalBusiness,
+        schema:MedicalOrganization .
+
+schema:MedicalSign rdfs:subClassOf schema:MedicalSignOrSymptom .
+
+schema:Message rdfs:subClassOf schema:CreativeWork .
+
+schema:OnlineBusiness rdfs:subClassOf schema:Organization .
+
+schema:OnlineStore rdfs:subClassOf schema:OnlineBusiness .
+
+schema:OrganizationRole rdfs:subClassOf schema:Role .
+
+schema:PaymentCard rdfs:subClassOf schema:FinancialProduct,
+        schema:PaymentMethod .
+
+schema:Permit rdfs:subClassOf schema:Intangible .
+
+schema:Person rdfs:subClassOf schema:Thing .
+
+schema:PhysicalActivity rdfs:subClassOf schema:LifestyleModification .
+
+schema:PropertyValue rdfs:subClassOf schema:StructuredValue .
+
+schema:PublicationIssue rdfs:subClassOf schema:CreativeWork .
+
+schema:QuantitativeValue rdfs:subClassOf schema:StructuredValue .
+
+schema:QuantitativeValueDistribution rdfs:subClassOf schema:StructuredValue .
+
+schema:Resort rdfs:subClassOf schema:LodgingBusiness .
+
+schema:ScholarlyArticle rdfs:subClassOf schema:Article .
+
+schema:SizeGroupEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:SizeSystemEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:Specialty rdfs:subClassOf schema:Enumeration .
+
+schema:SportsOrganization rdfs:subClassOf schema:Organization .
+
+schema:TechArticle rdfs:subClassOf schema:Article .
+
+schema:UseAction rdfs:subClassOf schema:ConsumeAction .
+
+schema:VideoObject rdfs:subClassOf schema:MediaObject .
+
+schema:WebContent rdfs:subClassOf schema:CreativeWork .
+
+schema:AudioObject rdfs:subClassOf schema:MediaObject .
+
+schema:Book rdfs:subClassOf schema:CreativeWork .
+
+schema:BroadcastChannel rdfs:subClassOf schema:Intangible .
+
+schema:EnergyEfficiencyEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:HowToItem rdfs:subClassOf schema:ListItem .
+
+schema:ImageObject rdfs:subClassOf schema:MediaObject .
+
+schema:InformAction rdfs:subClassOf schema:CommunicateAction .
+
+schema:InsertAction rdfs:subClassOf schema:AddAction .
+
+schema:LegalService rdfs:subClassOf schema:LocalBusiness .
+
+schema:LifestyleModification rdfs:subClassOf schema:MedicalEntity .
+
+schema:LoanOrCredit rdfs:subClassOf schema:FinancialProduct .
+
+schema:MeasurementTypeEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:MediaGallery rdfs:subClassOf schema:CollectionPage .
+
+schema:MedicalCondition rdfs:subClassOf schema:MedicalEntity .
+
+schema:MedicalGuideline rdfs:subClassOf schema:MedicalEntity .
+
+schema:MedicalRiskEstimator rdfs:subClassOf schema:MedicalEntity .
+
+schema:MedicalSignOrSymptom rdfs:subClassOf schema:MedicalCondition .
+
+schema:MedicalStudy rdfs:subClassOf schema:MedicalEntity .
+
+schema:MusicPlaylist rdfs:subClassOf schema:CreativeWork .
+
+schema:PaymentMethod rdfs:subClassOf schema:Intangible .
+
+schema:PeopleAudience rdfs:subClassOf schema:Audience .
+
+schema:Periodical rdfs:subClassOf schema:CreativeWorkSeries .
+
+schema:Physician rdfs:subClassOf schema:MedicalBusiness,
+        schema:MedicalOrganization .
+
+schema:PlayAction rdfs:subClassOf schema:Action .
+
+schema:Project rdfs:subClassOf schema:Organization .
+
+schema:PublicationEvent rdfs:subClassOf schema:Event .
+
+schema:RadioChannel rdfs:subClassOf schema:BroadcastChannel .
+
+schema:Rating rdfs:subClassOf schema:Intangible .
+
+schema:Residence rdfs:subClassOf schema:Place .
+
+schema:Room rdfs:subClassOf schema:Accommodation .
+
+schema:Series rdfs:subClassOf schema:Intangible .
+
+schema:SocialMediaPosting rdfs:subClassOf schema:Article .
+
+schema:Substance rdfs:subClassOf schema:MedicalEntity .
+
+schema:TherapeuticProcedure rdfs:subClassOf schema:MedicalProcedure .
+
+schema:VisualArtwork rdfs:subClassOf schema:CreativeWork .
+
+schema:AchieveAction rdfs:subClassOf schema:Action .
+
+schema:Certification rdfs:subClassOf schema:CreativeWork,
+        <https://spec.edmcouncil.org/fibo/ontology/FND/Arrangements/Documents/Certificate> .
+
+schema:Comment rdfs:subClassOf schema:CreativeWork .
+
+schema:CreativeWorkSeason rdfs:subClassOf schema:CreativeWork .
+
+schema:DoseSchedule rdfs:subClassOf schema:MedicalIntangible .
+
+schema:EmergencyService rdfs:subClassOf schema:LocalBusiness .
+
+schema:Episode rdfs:subClassOf schema:CreativeWork .
+
+schema:FindAction rdfs:subClassOf schema:Action .
+
+schema:InvestmentOrDeposit rdfs:subClassOf schema:FinancialProduct .
+
+schema:LearningResource rdfs:subClassOf schema:CreativeWork .
+
+schema:MedicalIndication rdfs:subClassOf schema:MedicalEntity .
+
+schema:MoveAction rdfs:subClassOf schema:Action .
+
+schema:Offer rdfs:subClassOf schema:Intangible .
+
+schema:PerformingGroup rdfs:subClassOf schema:Organization .
+
+schema:PlanAction rdfs:subClassOf schema:OrganizeAction .
+
+schema:Role rdfs:subClassOf schema:Intangible .
+
+schema:UpdateAction rdfs:subClassOf schema:Action .
+
+schema:Vessel rdfs:subClassOf schema:AnatomicalStructure .
+
+schema:AdministrativeArea rdfs:subClassOf schema:Place .
+
+schema:AllocateAction rdfs:subClassOf schema:OrganizeAction .
+
+schema:AssessAction rdfs:subClassOf schema:Action .
+
+schema:BioChemEntity rdfs:subClassOf schema:Thing .
+
+schema:Clip rdfs:subClassOf schema:CreativeWork .
+
+schema:DigitalDocument rdfs:subClassOf schema:CreativeWork,
+        <https://spec.edmcouncil.org/fibo/ontology/FND/Arrangements/Documents/Document> .
+
+schema:FinancialService rdfs:subClassOf schema:LocalBusiness .
+
+schema:ItemList rdfs:subClassOf schema:Intangible .
+
+schema:Landform rdfs:subClassOf schema:Place .
+
+schema:MedicalTest rdfs:subClassOf schema:MedicalEntity .
+
+schema:OrganizeAction rdfs:subClassOf schema:Action .
+
+schema:PriceSpecification rdfs:subClassOf schema:StructuredValue .
+
+schema:QualitativeValue rdfs:subClassOf schema:Enumeration .
+
+schema:Vehicle rdfs:subClassOf schema:Product .
+
+schema:Accommodation rdfs:subClassOf schema:Place .
+
+schema:Audience rdfs:subClassOf schema:Intangible .
+
+schema:GovernmentBuilding rdfs:subClassOf schema:CivicStructure .
+
+schema:ListItem rdfs:subClassOf schema:Intangible .
+
+schema:MedicalProcedure rdfs:subClassOf schema:MedicalEntity .
+
+schema:MedicalTherapy rdfs:subClassOf schema:TherapeuticProcedure .
+
+schema:NonprofitType rdfs:subClassOf schema:Enumeration .
+
+schema:PlaceOfWorship rdfs:subClassOf schema:CivicStructure .
+
+schema:SoftwareApplication rdfs:subClassOf schema:CreativeWork .
+
+schema:Trip rdfs:subClassOf schema:Intangible .
+
+schema:CreateAction rdfs:subClassOf schema:Action .
+
+schema:EducationalOrganization rdfs:subClassOf schema:CivicStructure,
+        schema:Organization .
+
+schema:FinancialProduct rdfs:subClassOf schema:Service .
+
+schema:HealthAndBeautyBusiness rdfs:subClassOf schema:LocalBusiness .
+
+schema:MedicalIntangible rdfs:subClassOf schema:MedicalEntity .
+
+schema:NewsArticle rdfs:subClassOf schema:Article .
+
+schema:ReactAction rdfs:subClassOf schema:AssessAction .
+
+schema:Review rdfs:subClassOf schema:CreativeWork .
+
+schema:WebPageElement rdfs:subClassOf schema:CreativeWork .
+
+schema:AnatomicalStructure rdfs:subClassOf schema:MedicalEntity .
+
+schema:Article rdfs:subClassOf schema:CreativeWork .
+
+schema:ControlAction rdfs:subClassOf schema:Action .
+
+schema:CreativeWorkSeries rdfs:subClassOf schema:CreativeWork,
+        schema:Series .
+
+schema:EntertainmentBusiness rdfs:subClassOf schema:LocalBusiness .
+
+schema:LodgingBusiness rdfs:subClassOf schema:LocalBusiness .
+
+schema:MedicalOrganization rdfs:subClassOf schema:Organization .
+
+schema:StatusEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:BodyOfWater rdfs:subClassOf schema:Landform .
+
+schema:CommunicateAction rdfs:subClassOf schema:InteractAction .
+
+schema:HomeAndConstructionBusiness rdfs:subClassOf schema:LocalBusiness .
+
+schema:Product rdfs:subClassOf schema:Thing .
+
+schema:Service rdfs:subClassOf schema:Intangible .
+
+schema:TradeAction rdfs:subClassOf schema:Action .
+
+schema:AutomotiveBusiness rdfs:subClassOf schema:LocalBusiness .
+
+schema:ConsumeAction rdfs:subClassOf schema:Action .
+
+schema:FoodEstablishment rdfs:subClassOf schema:LocalBusiness .
+
+schema:InteractAction rdfs:subClassOf schema:Action .
+
+schema:MediaObject rdfs:subClassOf schema:CreativeWork .
+
+schema:SportsActivityLocation rdfs:subClassOf schema:LocalBusiness .
+
+schema:UserInteraction rdfs:subClassOf schema:Event .
+
+schema:Place rdfs:subClassOf schema:Thing .
+
+schema:Reservation rdfs:subClassOf schema:Intangible .
+
+schema:TransferAction rdfs:subClassOf schema:Action .
+
+schema:WebPage rdfs:subClassOf schema:CreativeWork .
+
+schema:MedicalEnumeration rdfs:subClassOf schema:Enumeration .
+
+schema:Action rdfs:subClassOf schema:Thing .
+
+schema:MedicalEntity rdfs:subClassOf schema:Thing .
+
+schema:Organization rdfs:subClassOf schema:Thing .
+
+schema:Event rdfs:subClassOf schema:Thing .
+
+schema:MedicalBusiness rdfs:subClassOf schema:LocalBusiness .
+
+schema:LocalBusiness rdfs:subClassOf schema:Organization,
+        schema:Place .
+
+schema:Store rdfs:subClassOf schema:LocalBusiness .
+
+schema:StructuredValue rdfs:subClassOf schema:Intangible .
+
+schema:CivicStructure rdfs:subClassOf schema:Place .
+
+schema:Enumeration rdfs:subClassOf schema:Intangible .
+
+schema:Intangible rdfs:subClassOf schema:Thing .
+
+schema:CreativeWork rdfs:subClassOf schema:Thing .
+
