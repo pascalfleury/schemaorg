@@ -138,7 +138,7 @@ def configure_rich_logging(
     """Route root logging through RichHandler so logs print cleanly above bars."""
     logging.basicConfig(
         level=level,
-        format="%(message)s",
+        format="%(name)s: %(message)s",
         handlers=[
             RichHandler(
                 console=console,
@@ -187,7 +187,7 @@ class RichProgressReporter:
     ) -> None:
         self.console: Console = console if console is not None else Console()
         self.logger: logging.Logger = (
-            logger if logger is not None else logging.getLogger(__name__)
+            logger if logger is not None else logging.getLogger("schemaorg")
         )
         self._lock: threading.Lock = threading.Lock()
         self._explicit_depth: int = 0

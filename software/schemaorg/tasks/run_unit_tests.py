@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+import io
 import logging
 import math
 from pathlib import Path
@@ -50,21 +51,51 @@ class _ShardOutcome:
 
 
 class _CollectingTestResult(unittest.TestResult):
-    """Collects picklable outcomes for one test shard."""
+    """Collects picklable outcomes and buffers stdio/logs for passing tests."""
 
     def __init__(self) -> None:
         super().__init__()
+        self.buffer = True
         self.test_ids: list[str] = []
+        self._log_buffer: io.StringIO = io.StringIO()
+        self._saved_root_handlers: list[logging.Handler] = []
 
     def startTest(self, test: unittest.TestCase) -> None:
         super().startTest(test)
         self.test_ids.append(test.id())
+        self._log_buffer = io.StringIO()
+        root = logging.getLogger()
+        self._saved_root_handlers = list(root.handlers)
+        handler = logging.StreamHandler(self._log_buffer)
+        handler.setLevel(root.level)
+        handler.setFormatter(
+            logging.Formatter("%(levelname)s %(name)s: %(message)s")
+        )
+        root.handlers = [handler]
+
+    def stopTest(self, test: unittest.TestCase) -> None:
+        logging.getLogger().handlers = self._saved_root_handlers
+        # Traceback already embeds captured stdout/stderr; suppress duplicate mirror.
+        self._mirrorOutput = False
+        super().stopTest(test)
+
+    def _append_captured_logs(
+        self, entries: list[tuple[unittest.TestCase, str]]
+    ) -> None:
+        logs = self._log_buffer.getvalue()
+        if logs and entries:
+            case, tb = entries[-1]
+            if not logs.endswith("\n"):
+                logs += "\n"
+            entries[-1] = (case, f"{tb}\nCaptured logs:\n{logs}")
 
     def addError(self, test: unittest.TestCase, err: Any) -> None:
         super().addError(test, err)
+        self._append_captured_logs(self.errors)
 
     def addFailure(self, test: unittest.TestCase, err: Any) -> None:
         super().addFailure(test, err)
+        self._append_captured_logs(self.failures)
 
 
 def _iter_cases(suite: unittest.TestSuite) -> Iterator[unittest.TestCase]:

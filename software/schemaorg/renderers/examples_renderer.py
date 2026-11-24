@@ -11,10 +11,16 @@ import SchemaExamples.schemaexamples as schemaexamples
 log: logging.Logger = logging.getLogger(__name__)
 
 
-def render_examples(example_files: Sequence[Path]) -> str:
+def render_examples(
+    example_files: Sequence[Path],
+    output_path: Path | None = None,
+) -> str:
     """Concatenate all parsed examples into one release text bundle."""
     if not example_files:
-        log.warning("No example files given; writing an empty examples file")
+        dest = f" ({output_path})" if output_path is not None else ""
+        log.warning(
+            "No example files given; writing an empty examples file%s", dest
+        )
         return ""
     loaded = schemaexamples.SchemaExamples.from_files(example_files)
     return "\n".join(ex.serialize() for ex in loaded.allExamples())

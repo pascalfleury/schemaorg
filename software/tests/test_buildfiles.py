@@ -362,7 +362,12 @@ class TestRenderers(unittest.TestCase):
         self.assertIn("<loc>https://schema.org/Person</loc>", unreleased)
 
     def testExamplesRenderer(self) -> None:
-        self.assertEqual(render_examples(()), "")
+        with self.assertLogs("schemaorg.renderers.examples_renderer", level="WARNING") as cap:
+            self.assertEqual(
+                render_examples((), output_path=Path("/tmp/empty-examples.txt")),
+                "",
+            )
+        self.assertIn("/tmp/empty-examples.txt", "\n".join(cap.output))
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             ex_file = root / "data" / "examples.txt"

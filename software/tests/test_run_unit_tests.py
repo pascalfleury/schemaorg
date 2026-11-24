@@ -26,11 +26,16 @@ class TestRunUnitTestsTask(unittest.TestCase):
 
         (self.tests_dir / "test_sample_ok.py").write_text(
             textwrap.dedent("""\
+                import logging
                 import unittest
                 class SampleOkTests(unittest.TestCase):
                     def test_pass(self) -> None:
+                        print("noisy-pass-stdout")
+                        logging.getLogger("sample.pass").warning("noisy-pass-warn")
                         self.assertEqual(1 + 1, 2)
                     def test_fail(self) -> None:
+                        print("fail-stdout-detail")
+                        logging.getLogger("sample.fail").warning("fail-warn-detail")
                         self.assertEqual(1, 2)
             """),
             encoding="utf-8",
@@ -60,7 +65,11 @@ class TestRunUnitTestsTask(unittest.TestCase):
         self.assertEqual(summary.failure_count, 1)
         self.assertEqual(summary.error_count, 0)
         self.assertFalse(summary.ok)
-        self.assertIn("(3/3 tests)", "\n".join(captured.output))
+        joined = "\n".join(captured.output)
+        self.assertIn("(3/3 tests)", joined)
+        self.assertNotIn("noisy-pass-warn", joined)
+        self.assertIn("fail-stdout-detail", summary.failures[0][1])
+        self.assertIn("fail-warn-detail", summary.failures[0][1])
 
     def test_skip_basics_runs_only_graphs_pattern(self) -> None:
         summary = RunUnitTestsTask(

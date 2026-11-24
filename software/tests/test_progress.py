@@ -146,7 +146,7 @@ class TestProgressReporter(unittest.TestCase):
 
             output = buf.getvalue()
             self.assertNotIn("quiet info message", output)
-            self.assertIn("loud warning [0]", output)
+            self.assertIn("test.rich.log: loud warning [0]", output)
         finally:
             root.handlers = saved_handlers
             root.setLevel(saved_level)

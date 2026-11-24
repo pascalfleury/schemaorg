@@ -159,6 +159,9 @@ def export_release_unscoped(
     owl = OwlRenderer(graph, version)
     shapes = ShapesRenderer(graph)
 
+    examples_path = releases.file(
+        version=version, filename="schemaorg-all-examples.txt"
+    )
     return [
         Artifact(
             "Context",
@@ -209,10 +212,8 @@ def export_release_unscoped(
         ),
         Artifact(
             "Examples",
-            releases.file(
-                version=version, filename="schemaorg-all-examples.txt"
-            ),
-            partial(render_examples, example_files),
+            examples_path,
+            partial(render_examples, example_files, output_path=examples_path),
             (),
         ),
     ]
